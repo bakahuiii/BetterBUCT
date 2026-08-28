@@ -5,8 +5,14 @@
 // ── Polyfills (must run before any import that uses them) ──────────────
 // structuredClone is used by src/bridge.ts at module evaluation time.
 // Android WebView < Chromium 98 (2022) does not support it natively.
-if (typeof globalThis.structuredClone !== 'function') {
-  globalThis.structuredClone = function structuredClone(obj) {
+// Safe global access (globalThis may be missing on very old WebViews).
+const G = (typeof globalThis !== 'undefined') ? globalThis
+  : (typeof self !== 'undefined') ? self
+  : (typeof window !== 'undefined') ? window
+  : {};
+
+if (typeof G.structuredClone !== 'function') {
+  G.structuredClone = function structuredClone(obj) {
     if (obj === null || typeof obj !== 'object') return obj;
     return JSON.parse(JSON.stringify(obj));
   };
@@ -75,7 +81,7 @@ import { createCapacitorFilesystemBackend } from './store/capacitor-filesystem-b
 // imported dynamically (e.g. academic-api-client.mjs uses Buffer globally).
 // Static imports at the top of this file are safe because they run before any
 // dynamic import that references Buffer.
-globalThis.Buffer = globalThis.Buffer || Buffer;
+G.Buffer = G.Buffer || Buffer;
 
 function isNativePlatform() {
   try {

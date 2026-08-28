@@ -4,7 +4,7 @@ import { MobileStore } from './store/mobile-store.mjs';
 import { createWebStorageBackend } from './store/web-storage-backend.mjs';
 import { VaultService, VAULT_KEYS } from './vault/vault-service.mjs';
 import { SessionService } from './session/session-service.mjs';
-import { mockState } from './mock/mock-data.mjs';
+import { getMockState } from './mock/mock-data.mjs';
 
 // ── Event Bus ──────────────────────────────────────────────────────────────
 class EventBus {
@@ -137,7 +137,7 @@ export class MobileBridge {
   }
 
   async _seedMockData() {
-    this._state = structuredClone(mockState);
+    this._state = structuredClone(getMockState());
     this._state.appVersion = '0.5.1-mobile';
     this._state.createdAt = new Date().toISOString();
     this._state.updatedAt = this._state.createdAt;

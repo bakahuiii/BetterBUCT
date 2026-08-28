@@ -2,6 +2,8 @@
 // src/bridge.ts resolves window.theia to our adapter, then mount the desktop
 // React app unchanged, plus mobile-only enhancements.
 import './install-mobile-bridge.mjs';
+// Modules are executing — disarm the boot watchdog.
+window.__THEIA_BOOTED__ = true;
 import './mobile.css';
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';

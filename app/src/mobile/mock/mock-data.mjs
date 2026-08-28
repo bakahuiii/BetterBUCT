@@ -1,6 +1,9 @@
 // Stage-0 mock campus data from desktop demo.ts (serialized to JSON).
 // This module re-hydrates the mock state with fresh timestamps so demo
-// items always appear current.
+// items always appear current. Loading is lazy: module evaluation must not
+// call structuredClone (Android 9 WebView lacks it until the inline
+// polyfill in index.html has run, and this module may be evaluated during
+// the import graph).
 import demoState from './mock-data.json' with { type: 'json' };
 
 function isoAfter(hours) {
@@ -23,7 +26,6 @@ export function createMockState() {
     domains: {},
     runId: null,
   };
-  // Refresh relative timestamps so demo items look fresh
   if (state.exams && state.exams.length) {
     state.exams[0].examTime = isoAfter(120);
     state.exams[0].startAt = isoAfter(120);
@@ -42,4 +44,8 @@ export function createMockState() {
   return state;
 }
 
-export const mockState = createMockState();
+let cachedMockState = null;
+export function getMockState() {
+  if (cachedMockState === null) cachedMockState = createMockState();
+  return cachedMockState;
+}

@@ -59,7 +59,14 @@
   - Vite `build.target` es2022 → es2018（旧 WebView 语法兼容）
   - 全局错误覆盖层：JS 崩溃时屏幕显示错误信息（不再白屏）
 - **验证**：native-sim 测试（headless Chrome 注入 fake Capacitor + Filesystem/Preferences 插件）→ dashboard/数据/FAB 全部渲染，无错误触发
-- **APK**：`release/THEIA-mobile-fix1-debug.apk`（107.1MB）
+- **APK（fix1）**：`release/THEIA-mobile-fix1-debug.apk`（107.1MB）
+- **fix2（安卓9 复测仍白屏）**：
+  - 实锤：dist 产物含依赖里的可选链/空值合并（Vite 不转译 node_modules）→ Chromium 74 parse error → 入口模块加载失败 → 白屏（连错误层都不执行）
+  - `legacySyntaxTransformPlugin`：generateBundle 钩子用 esbuild 把所有 chunk 强制降到 chrome74 语法（19/19 chunk 校验通过）
+  - **inline ES5 polyfill**（index.html 非 module script，先于任何 module 执行）：structuredClone/Object.hasOwn/Array.prototype.at/String.replaceAll，且用安全的全局对象访问（`globalThis` 可能不存在）
+  - mock-data 惰性化：模块求值不再调用 structuredClone（import 提升顺序问题）
+  - **启动看门狗**：6 秒未 boot 显示红色错误页（不再纯白屏）
+- **APK（fix2）**：`release/THEIA-mobile-fix2-debug.apk`（107.2MB）
 
 ---
 

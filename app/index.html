@@ -7,6 +7,55 @@
     <meta name="theme-color" content="#0b1220" />
     <link rel="icon" type="image/png" href="/src/assets/theia-mark.png" />
     <title>THEIA 移动版</title>
+    <script>
+      // ── THEIA legacy polyfills ──────────────────────────────────────────
+      // Plain (non-module) script runs BEFORE any ES module. ES5 only, so it
+      // works on any Android WebView. Android 9 (Chromium 74) lacks
+      // structuredClone, Object.hasOwn, Array.prototype.at, String.replaceAll
+      // and possibly globalThis.
+      (function () {
+        var g = (typeof globalThis !== 'undefined') ? globalThis
+               : (typeof self !== 'undefined') ? self
+               : (typeof window !== 'undefined') ? window
+               : this;
+
+        if (typeof g.structuredClone !== 'function') {
+          g.structuredClone = function structuredClone(value) {
+            if (value === null || typeof value !== 'object') return value;
+            return JSON.parse(JSON.stringify(value));
+          };
+        }
+        if (typeof Object.hasOwn !== 'function') {
+          Object.hasOwn = function hasOwn(obj, key) {
+            return Object.prototype.hasOwnProperty.call(obj, key);
+          };
+        }
+        if (typeof Array.prototype.at !== 'function') {
+          Array.prototype.at = function at(index) {
+            var length = this.length;
+            var relative = Number(index) || 0;
+            var k = relative >= 0 ? relative : length + relative;
+            return (k < 0 || k >= length) ? undefined : this[k];
+          };
+        }
+        if (typeof String.prototype.replaceAll !== 'function') {
+          String.prototype.replaceAll = function replaceAll(search, replacement) {
+            return this.split(search).join(replacement);
+          };
+        }
+        g.__THEIA_POLYFILLS__ = true;
+
+        // Watchdog: if no ES module sets __THEIA_BOOTED__ within 6s, the app
+        // bundle failed to load/parse. Show the failure instead of a white screen.
+        setTimeout(function () {
+          if (window.__THEIA_BOOTED__) return;
+          var div = document.createElement('div');
+          div.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0b1220;color:#e74c3c;padding:48px 24px;font:14px/1.6 system-ui,sans-serif;white-space:pre-wrap;word-break:break-all;';
+          div.textContent = 'THEIA 应用资源加载失败。\n\nWebView 无法解析应用脚本。\n\n请更新系统 WebView 后重试；或将此截图发给开发者。';
+          document.body.appendChild(div);
+        }, 6000);
+      })();
+    </script>
     <script type="module" src="/src/appearance-bootstrap.ts"></script>
   </head>
   <body>
