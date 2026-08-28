@@ -361,6 +361,24 @@ export class MobileBridge {
   // Real API-first campus login (stage 1). Uses the reused desktop
   // core/academic-api-client.mjs in the WebView (via node:crypto polyfill +
   // CapacitorHttp native fetch). Falls back to mock for the demo profile.
+  // Mobile-only: restricted WebView CAS login (native plugin). Establishes a
+  // shared campus session (jwglxt + theol + mail) when API-first login is not
+  // available or a captcha is required.
+  async loginWithRestrictedWebView({ url = 'https://authserver.buct.edu.cn/authserver/login' } = {}) {
+    const result = await this.session.openRestrictedLoginWebView({
+      url,
+      whitelist: this.session.whitelist || undefined,
+    });
+    if (result?.canceled) return { canceled: true };
+    if (result?.cookies) {
+      this._auth = { ...connectedStatus() };
+      this._credentialStatus = { saved: true, encryptionAvailable: true };
+      this.events.emit('auth-status', this._auth);
+      return { canceled: false };
+    }
+    return { canceled: false };
+  }
+
   async login() {
     await this.init();
     this.events.emit('sync-progress', { stage: 'all', status: 'syncing', label: '正在连接教务系统…' });
@@ -473,6 +491,11 @@ export class MobileBridge {
         this.events.emit('auth-status', this._auth);
         emitProgress('all', 'done', '校园数据更新完成');
         this._publishState();
+        const { notifySyncResult } = await import('./notify.mjs');
+        void notifySyncResult({
+          ok: true,
+          scheduleCount: this._state?.schedule?.length || 0,
+        });
         return structuredClone(this._state);
       }
 
@@ -513,12 +536,16 @@ export class MobileBridge {
       await this._persist();
       emitProgress('all', 'done', '校园数据更新完成');
       this._publishState();
+      const { notifySyncResult } = await import('./notify.mjs');
+      void notifySyncResult({ ok: true, scheduleCount: this._state?.schedule?.length || 0 });
     } catch (error) {
       this._state.sync.lastError = String(error);
       this._state.sync.lastCompletedAt = new Date().toISOString();
       await this._persist();
       emitProgress('all', 'error', '校园数据更新失败', String(error));
       this._publishState();
+      const { notifySyncResult } = await import('./notify.mjs');
+      void notifySyncResult({ ok: false, error: String(error) });
     } finally {
       this._syncing = false;
     }

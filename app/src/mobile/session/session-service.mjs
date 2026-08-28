@@ -1,12 +1,29 @@
 // TheiaSession — campus cookie/session handling for the WebView.
-// Provides the cookie jar used by the API-first client and scaffolding for the
-// restricted WebView CAS login (stage 1.2).
+// Native builds use the TheiaSession Capacitor plugin (restricted WebView CAS
+// login, whitelist enforcement, cookie capture); web preview falls back to
+// localStorage cookie jars for dev.
 const COOKIE_PREFIX = 'theia-mobile/session/cookies/v1/';
+
+function nativeSession() {
+  try {
+    if (window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins?.TheiaSession) {
+      return window.Capacitor.Plugins.TheiaSession;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
 
 export class SessionService {
   constructor({ storage = globalThis.localStorage } = {}) {
     this.storage = storage;
     this.cookies = new Map();
+    this._native = null;
+    this.whitelist = [...CAMPUS_WHITELIST];
+  }
+
+  get native() {
+    if (this._native === undefined) this._native = nativeSession();
+    return this._native;
   }
 
   keyFor(domain) {
@@ -41,6 +58,16 @@ export class SessionService {
     return [...this.cookies].map(([name, value]) => name + '=' + value).join('; ');
   }
 
+  async getNativeCookies(host) {
+    if (!this.native) return '';
+    try {
+      const result = await this.native.getCookies({ host });
+      return result?.cookies || '';
+    } catch {
+      return '';
+    }
+  }
+
   clear(domain) {
     this.cookies.clear();
     try {
@@ -48,11 +75,39 @@ export class SessionService {
     } catch { /* ignore */ }
   }
 
-  async openRestrictedLoginWebView(options) {
-    // Stage 1.2: opens a native WebView restricted to whitelisted campus
-    // domains (no address bar, no downloads, no arbitrary navigation).
-    // The native theia-session plugin will implement this; here we return a
-    // structured error so callers degrade gracefully.
-    throw new Error('受限 WebView 登录尚未在原生插件中实现（阶段1.2）');
+  // Opens a restricted native WebView for CAS login.
+  // - url: the campus login page (whitelisted)
+  // - whitelist: campus domains allowed to load
+  // Returns { canceled, cookies } where cookies is a "host|cookie; cookie" map.
+  async openRestrictedLoginWebView({ url, whitelist = CAMPUS_WHITELIST } = {}) {
+    if (this.native) {
+      const result = await this.native.openRestrictedLogin({
+        url,
+        whitelist,
+      });
+      // Adopt captured cookies into the session jar.
+      if (result?.cookies) {
+        for (const line of String(result.cookies).split('\n')) {
+          const separator = line.indexOf('|');
+          if (separator <= 0) continue;
+          const host = line.slice(0, separator);
+          const cookieLine = line.slice(separator + 1);
+          for (const pair of cookieLine.split(';')) {
+            const eq = pair.indexOf('=');
+            if (eq <= 0) continue;
+            this.setCookie(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim(), host);
+          }
+        }
+      }
+      return result || { canceled: true, cookies: '' };
+    }
+    // Web preview: no native WebView. Keep the throw so callers degrade.
+    throw new Error('受限 WebView 登录仅原生可用（请安装 APK 后重试）');
   }
 }
+
+export const CAMPUS_WHITELIST = [
+  'buct.edu.cn', 'jwglxt.buct.edu.cn', 'course.buct.edu.cn',
+  'authserver.buct.edu.cn', 'mail.buct.edu.cn', 'motion.buct.edu.cn',
+  'xsfw.buct.edu.cn', 'ehall.buct.edu.cn', 'lib.buct.edu.cn',
+];

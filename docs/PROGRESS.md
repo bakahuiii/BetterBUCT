@@ -29,8 +29,8 @@
 - [x] **真实校园管线验证**（live 测试 3/3）：登录页 / 公钥（1024 位 RSA）/ RSA 加密回环
 
 ### 待完成（阶段1）
-- [ ] 受限 WebView CAS 登录（原生插件，白名单 buct.edu.cn）
-- [ ] THEOL 同步（作业/通知，复用 theol-mobile 解析器）
+- [x] ~~受限 WebView CAS 登录~~ → 已完成（阶段3，见下）
+- [x] ~~THEOL 同步~~ → 已完成（阶段3，见下）
 - [ ] `core/store.mjs` 完整能力（锁/恢复/并发）移植
 
 ## 阶段2：P0 功能 UI 适配（✅ 主体完成）
@@ -50,9 +50,13 @@
 
 - [x] **THEOL 接入**：`campus-sync.syncTheol()` 复用桌面 `TheolAdapter`（courses/notices），JSON 移动端回退端点（`stuUnDoTaskList.do`，已探测可达，未登录返回 `status:-2`）已接通
 - [x] THEOL 在 syncNow 中 best-effort：无会话时报 auth-required 而不中断 jwglxt 同步
-- [ ] THEOL 作业（依赖受限 WebView CAS 会话，阶段1.2）
+- [x] **受限 WebView CAS 登录（原生插件）**：`TheiaSessionPlugin.java` + `RestrictedLoginActivity.java`
+  - 白名单域名（buct.edu.cn 及子域）强制 HTTPS，禁下载/禁任意导航/禁 file 访问
+  - Cookie 拦截返回 JS 桥，会话注入 `SessionService`
+  - 已编译进 APK（Capacitor 7 ActivityCallback 模式）
+- [x] **本地通知**：`notify.mjs`（@capacitor/local-notifications），同步完成/失败提醒
 - [ ] 抢课、邮箱、空闲教室、场馆（复用 core，逐步接入）
-- [ ] 后台同步（WorkManager）+ 本地通知
+- [ ] 后台同步（WorkManager）
 
 ## 阶段4：打磨与发布
 

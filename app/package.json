@@ -20,6 +20,7 @@
     "@capacitor/app": "^7.1.0",
     "@capacitor/core": "^7.4.0",
     "@capacitor/filesystem": "^7.1.0",
+    "@capacitor/local-notifications": "^7.0.7",
     "@capacitor/network": "^7.0.0",
     "@capacitor/preferences": "^7.0.0",
     "@capacitor/share": "^7.0.4",

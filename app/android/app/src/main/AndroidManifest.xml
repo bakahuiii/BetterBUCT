@@ -24,6 +24,12 @@
 
         </activity>
 
+        <activity
+            android:name=".RestrictedLoginActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
