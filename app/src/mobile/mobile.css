@@ -238,7 +238,7 @@ html, body {
 .theia-mobile-actions {
   position: fixed;
   right: calc(var(--theia-safe-right) + 14px);
-  bottom: calc(var(--theia-safe-bottom) + 14px);
+  bottom: calc(var(--theia-safe-bottom) + 74px); /* above the bottom tab bar */
   z-index: 200;
   display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
 }
