@@ -5,6 +5,8 @@
 // unchanged; only the orchestration is mobile-specific.
 import { AcademicApiClient } from '../../../core/academic-api-client.mjs';
 import { JwglxtAdapter } from '../../../core/adapters/jwglxt.mjs';
+import { TheolAdapter } from '../../../core/adapters/theol.mjs';
+import { AuthRequiredError } from '../../../core/source-client.mjs';
 import { mergeSyncResult } from '../../../core/schema.mjs';
 
 export const JWGLXT_SYNC_DOMAINS = [
@@ -72,5 +74,67 @@ export class CampusSync {
   async status() {
     if (!this.adapter) await this.connect();
     return this.adapter.status();
+  }
+
+  // ── THEOL (北化在线) ──────────────────────────────────────────────────
+  // The desktop TheolAdapter needs a page()+json() client and a shared CAS
+  // session. The mobile flow establishes the session via restricted WebView
+  // login (stage 1.2); until then, sync reports auth-required gracefully and
+  // the read-only mobile endpoint can still be probed.
+  async syncTheol(state, { domains = ['courses', 'notices'] } = {}) {
+    if (!this.theolClient) {
+      if (!this.client) await this.connect();
+      // TheolAdapter also uses client.json() for the mobile fallback endpoint,
+      // which AcademicApiClient does not expose — add it via a delegating wrapper.
+      const base = this.client;
+      this.theolClient = {
+        page: (...args) => base.page(...args),
+        form: (...args) => base.form(...args),
+        binary: (...args) => base.binary(...args),
+        async json(url, init = {}, options = {}) {
+          const result = await base.request(url, {
+            ...init,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json',
+              ...(init?.headers || {}),
+            },
+          }, 0);
+          try {
+            return JSON.parse(result.text);
+          } catch {
+            throw new Error('THEOL JSON 端点返回了非 JSON 响应');
+          }
+        },
+        setDiagnostic: (cb) => base.setDiagnostic(cb),
+      };
+      this.theolAdapter = new TheolAdapter(this.theolClient);
+    }
+    try {
+      const result = await this.theolAdapter.sync({ domains });
+      const merged = mergeSyncResult(state, {
+        ...result,
+        runId: new Date().toISOString(),
+        completed: true,
+      });
+      return { state: merged, result, authRequired: false };
+    } catch (error) {
+      if (error instanceof AuthRequiredError) {
+        return { state, result: null, authRequired: true, error };
+      }
+      throw error;
+    }
+  }
+
+  // Probes the read-only THEOL mobile pending-task endpoint (no session needed
+  // to learn the auth state; with a session it returns the task feed).
+  async probeTheolMobile() {
+    try {
+      const url = 'http://course.buct.edu.cn/mobile/stuUnDoTaskList.do';
+      const payload = await this.theolClient?.json?.(url, {}, { source: 'THEOL mobile probe' });
+      return { reachable: true, authenticated: payload?.status === 1, payload };
+    } catch {
+      return { reachable: false, authenticated: false };
+    }
   }
 }

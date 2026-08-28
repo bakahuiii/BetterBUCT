@@ -46,9 +46,12 @@
 - [ ] 真机触控/窄屏实测调优
 - [ ] 移动端专属首页/导航（如需）
 
-## 阶段3：P1 功能
+## 阶段3：P1 功能（进行中）
 
-- [ ] THEOL 作业、抢课、邮箱、空闲教室、场馆
+- [x] **THEOL 接入**：`campus-sync.syncTheol()` 复用桌面 `TheolAdapter`（courses/notices），JSON 移动端回退端点（`stuUnDoTaskList.do`，已探测可达，未登录返回 `status:-2`）已接通
+- [x] THEOL 在 syncNow 中 best-effort：无会话时报 auth-required 而不中断 jwglxt 同步
+- [ ] THEOL 作业（依赖受限 WebView CAS 会话，阶段1.2）
+- [ ] 抢课、邮箱、空闲教室、场馆（复用 core，逐步接入）
 - [ ] 后台同步（WorkManager）+ 本地通知
 
 ## 阶段4：打磨与发布

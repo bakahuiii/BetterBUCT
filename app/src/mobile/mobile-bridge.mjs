@@ -446,9 +446,28 @@ export class MobileBridge {
           domains: ['profile', 'terms', 'schedule', 'grades', 'exams', 'selected-courses', 'academic-progress', 'notices'],
         });
         this._state = state;
+
+        // THEOL sync is best-effort: needs the shared CAS session (restricted
+        // WebView login, stage 1.2). Without it, report auth-required without
+        // failing the whole jwglxt sync.
+        let theolConnected = false;
+        try {
+          emitProgress('theol', 'syncing', '正在同步北化在线THEOL…');
+          const theol = await campusSync.syncTheol(this._state, { domains: ['courses', 'notices'] });
+          if (theol.authRequired) {
+            emitProgress('theol', 'error', 'THEOL 需要登录（受限 WebView CAS 登录尚未实现）', 'auth_required');
+          } else if (theol.state) {
+            this._state = theol.state;
+            theolConnected = true;
+            emitProgress('theol', 'done', 'THEOL 同步完成');
+          }
+        } catch (theolError) {
+          emitProgress('theol', 'error', 'THEOL 同步失败', String(theolError?.message || theolError));
+        }
+
         this._auth = {
           jwglxt: { connected: true, unchecked: false },
-          theol: { connected: this._state?.settings?.academicAuthMode !== 'api', unchecked: false },
+          theol: { connected: theolConnected, unchecked: !theolConnected },
         };
         await this._persist();
         this.events.emit('auth-status', this._auth);
