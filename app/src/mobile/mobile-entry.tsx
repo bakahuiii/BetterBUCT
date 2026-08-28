@@ -16,6 +16,7 @@ window.__THEIA_BOOTED__ = true;
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import MobileActions from './MobileActions';
+import MobileTabBar from './MobileTabBar';
 import '../main';
 // mobile.css must load AFTER '../main' (which pulls desktop styles.css) so our
 // mobile overrides win the cascade.
@@ -56,6 +57,7 @@ function MobileEnhancements() {
           setTimeout(() => setMessage(null), 5000);
         }}
       />
+      <MobileTabBar />
       {message && (
         <div
           style={{
