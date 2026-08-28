@@ -24,6 +24,7 @@
     "@capacitor/network": "^7.0.0",
     "@capacitor/preferences": "^7.0.0",
     "@capacitor/share": "^7.0.4",
+    "@capacitor/status-bar": "^7.0.6",
     "buffer": "^6.0.3",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",

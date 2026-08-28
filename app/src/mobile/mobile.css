@@ -404,3 +404,26 @@ html, body {
   background: color-mix(in srgb, var(--card, #1a2230) 80%, transparent) !important;
   border-color: color-mix(in srgb, var(--border, #2a3545) 80%, transparent) !important;
 }
+
+/* ── 启动屏（移动端） ─────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .loading-screen {
+    background: radial-gradient(120% 80% at 50% 20%, #1a2733 0%, #0d141d 60%) !important;
+  }
+  .loading-screen .brand-mark {
+    width: 64px; height: 64px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 16px 44px -14px rgba(0,0,0,.65);
+    animation: theia-soft-in .5s ease both;
+  }
+  .loading-screen strong { font-size: 26px; color: #f0ebe4; }
+  .loading-screen span { font-size: 13px; color: #8a9ba8; }
+}
+
+/* FAB 尺寸锁定 */
+.theia-mobile-fab {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 18px !important;
+}

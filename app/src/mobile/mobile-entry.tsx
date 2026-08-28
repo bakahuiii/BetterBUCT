@@ -4,7 +4,13 @@
 import './install-mobile-bridge.mjs';
 // Modules are executing — disarm the boot watchdog.
 declare global {
-  interface Window { __THEIA_BOOTED__?: boolean; }
+  interface Window {
+    __THEIA_BOOTED__?: boolean;
+    Capacitor?: {
+      isNativePlatform?: () => boolean;
+      Plugins?: Record<string, unknown>;
+    };
+  }
 }
 window.__THEIA_BOOTED__ = true;
 import { useState } from 'react';
@@ -16,6 +22,27 @@ import '../main';
 import './mobile.css';
 import { installPullToRefresh } from './mobile-gestures.mjs';
 import { bridge } from '../bridge';
+
+// Native status bar theming — follows the app's light/dark appearance.
+async function applyStatusBar() {
+  try {
+    if (!window.Capacitor?.isNativePlatform?.()) return;
+    const { StatusBar, Style } = await import('@capacitor/status-bar');
+    const isDark = document.documentElement.classList.contains('dark');
+    await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
+    await StatusBar.setBackgroundColor({ color: isDark ? '#141b26' : '#f5f7f7' });
+  } catch {
+    // Status bar theming is best-effort.
+  }
+}
+applyStatusBar();
+// Keep the status bar in sync when the appearance changes.
+try {
+  new MutationObserver(() => applyStatusBar()).observe(
+    document.documentElement,
+    { attributes: true, attributeFilter: ['class'] },
+  );
+} catch { /* ignore */ }
 
 // Mount mobile-only UI (FAB) after the desktop app mounts.
 function MobileEnhancements() {
