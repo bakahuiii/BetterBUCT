@@ -3,6 +3,9 @@
 // React app unchanged, plus mobile-only enhancements.
 import './install-mobile-bridge.mjs';
 // Modules are executing — disarm the boot watchdog.
+declare global {
+  interface Window { __THEIA_BOOTED__?: boolean; }
+}
 window.__THEIA_BOOTED__ = true;
 import './mobile.css';
 import { useState } from 'react';
