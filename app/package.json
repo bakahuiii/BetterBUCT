@@ -22,10 +22,15 @@
     "@capacitor/filesystem": "^7.1.0",
     "@capacitor/network": "^7.0.0",
     "@capacitor/preferences": "^7.0.0",
+    "buffer": "^6.0.3",
+    "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "iconv-lite": "^0.7.3",
+    "jsrsasign": "^11.1.5",
     "lucide-react": "^0.536.0",
     "marked": "^18.0.9",
+    "node-forge": "^1.4.0",
     "radix-ui": "^1.6.7",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -43,6 +48,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.8.3",
-    "vite": "^7.0.6"
+    "vite": "^7.0.6",
+    "vite-plugin-node-polyfills": "^0.28.0"
   }
 }

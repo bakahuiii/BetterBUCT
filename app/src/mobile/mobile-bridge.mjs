@@ -2,8 +2,8 @@
 // Implements the TheiaBridge contract (see src/types.ts) for the Capacitor WebView.
 import { MobileStore } from './store/mobile-store.mjs';
 import { createWebStorageBackend } from './store/web-storage-backend.mjs';
-// Native backend is imported dynamically when Capacitor is available
-// import { createCapacitorFilesystemBackend } from './store/capacitor-filesystem-backend.mjs';
+import { VaultService, VAULT_KEYS } from './vault/vault-service.mjs';
+import { SessionService } from './session/session-service.mjs';
 import { mockState } from './mock/mock-data.mjs';
 
 // ── Event Bus ──────────────────────────────────────────────────────────────
@@ -45,10 +45,12 @@ function connectedStatus() {
 
 // ── Mobile Bridge Class ────────────────────────────────────────────────────
 export class MobileBridge {
-  constructor({ storageBackend } = {}) {
+  constructor({ storageBackend, vault, session } = {}) {
     this.events = new EventBus();
     this.backend = storageBackend || createWebStorageBackend();
     this.store = new MobileStore(this.backend);
+    this.vault = vault || new VaultService();
+    this.session = session || new SessionService();
     this._state = null;
     this._auth = { ...disconnectedStatus(), };
     this._syncing = false;
@@ -84,10 +86,6 @@ export class MobileBridge {
         this._state = loaded;
         // If no auth, default disconnected
         this._auth = { ...disconnectedStatus() };
-        // If credential status was saved, restore
-        if (this._state.settings?.academicApiEnabled) {
-          this._academicApiCredentialStatus.saved = true;
-        }
       }
     } catch (error) {
       console.warn('[theia-mobile] store load failed, using mock:', error);
@@ -95,6 +93,27 @@ export class MobileBridge {
     if (!this._state) {
       // Seed with mock data for first-run or demo
       await this._seedMockData();
+    }
+    // Restore credential status from the vault
+    try {
+      const unified = await this.vault.getSecret(VAULT_KEYS.unified);
+      const apiCreds = await this.vault.getSecret(VAULT_KEYS.academicApi);
+      const mailCreds = await this.vault.getSecret(VAULT_KEYS.mail);
+      const modelKey = await this.vault.getSecret(VAULT_KEYS.modelApiKey);
+      this._credentialStatus = { saved: Boolean(unified), encryptionAvailable: true };
+      this._academicApiCredentialStatus = {
+        saved: Boolean(apiCreds),
+        encryptionAvailable: true,
+        enabled: Boolean(apiCreds) && this._state?.settings?.academicApiEnabled !== false,
+      };
+      this._mailCredentialStatus = { saved: Boolean(mailCreds), encryptionAvailable: true };
+      this._modelStatus = {
+        ...this._modelStatus,
+        apiKeySaved: Boolean(modelKey),
+        encryptionAvailable: true,
+      };
+    } catch (error) {
+      console.warn('[theia-mobile] vault restore failed:', error);
     }
     this._initialized = true;
     this.events.emit('snapshot', this._state);
@@ -246,29 +265,46 @@ export class MobileBridge {
   }
 
   async readSavedSecret(kind) {
-    // In real mobile, read from Keystore via Capacitor plugin
-    throw new Error('安全存储凭据查看在移动端开发中');
+    const keys = {
+      unified: VAULT_KEYS.unified,
+      'academic-api': VAULT_KEYS.academicApi,
+      mail: VAULT_KEYS.mail,
+      model: VAULT_KEYS.modelApiKey,
+    };
+    const value = await this.vault.getSecret(keys[kind] || kind);
+    if (!value) return null;
+    return typeof value === 'string' ? value : JSON.stringify(value);
   }
 
   async saveCredentials(credentials) {
     await this.init();
+    await this.vault.setSecret(VAULT_KEYS.unified, {
+      username: String(credentials?.username || ''),
+      password: String(credentials?.password || ''),
+      savedAt: new Date().toISOString(),
+    });
     this._credentialStatus = { saved: true, encryptionAvailable: true };
-    this._auth = { ...this._auth, ...connectedStatus() };
-    this._state.settings.academicApiEnabled = true;
-    await this._persist();
     this.events.emit('auth-status', this._auth);
     return { ...this._credentialStatus };
   }
 
   async saveAcademicApiCredentials(credentials) {
     await this.init();
+    await this.vault.setSecret(VAULT_KEYS.academicApi, {
+      username: String(credentials?.username || ''),
+      password: String(credentials?.password || ''),
+      savedAt: new Date().toISOString(),
+    });
     this._academicApiCredentialStatus = { saved: true, encryptionAvailable: true, enabled: true };
-    this._state.settings.academicApiEnabled = true;
+    if (this._state) this._state.settings.academicApiEnabled = true;
     await this._persist();
     return { ...this._academicApiCredentialStatus };
   }
 
   async clearCredentials() {
+    await this.vault.removeSecret(VAULT_KEYS.unified);
+    await this.vault.removeSecret(VAULT_KEYS.academicApi);
+    await this.vault.removeSecret(VAULT_KEYS.mail);
     this._credentialStatus = { saved: false, encryptionAvailable: false };
     this._academicApiCredentialStatus = { saved: false, encryptionAvailable: false, enabled: false };
     this._auth = { ...disconnectedStatus() };
@@ -279,6 +315,7 @@ export class MobileBridge {
   }
 
   async clearAcademicApiCredentials() {
+    await this.vault.removeSecret(VAULT_KEYS.academicApi);
     this._academicApiCredentialStatus = { saved: false, encryptionAvailable: false, enabled: false };
     if (this._state) this._state.settings.academicApiEnabled = false;
     await this._persist();
@@ -286,6 +323,11 @@ export class MobileBridge {
   }
 
   async saveMailCredentials(credentials) {
+    await this.vault.setSecret(VAULT_KEYS.mail, {
+      username: String(credentials?.username || ''),
+      password: String(credentials?.protocolPassword || credentials?.password || ''),
+      savedAt: new Date().toISOString(),
+    });
     this._mailCredentialStatus = { saved: true, encryptionAvailable: true };
     if (this._state) this._state.settings.mail.enabled = true;
     await this._persist();
@@ -293,6 +335,7 @@ export class MobileBridge {
   }
 
   async clearMailCredentials() {
+    await this.vault.removeSecret(VAULT_KEYS.mail);
     this._mailCredentialStatus = { saved: false, encryptionAvailable: false };
     if (this._state) this._state.settings.mail.enabled = false;
     await this._persist();
@@ -315,19 +358,55 @@ export class MobileBridge {
     throw new Error('校园邮箱在移动端开发中');
   }
 
+  // Real API-first campus login (stage 1). Uses the reused desktop
+  // core/academic-api-client.mjs in the WebView (via node:crypto polyfill +
+  // CapacitorHttp native fetch). Falls back to mock for the demo profile.
   async login() {
     await this.init();
+    this.events.emit('sync-progress', { stage: 'all', status: 'syncing', label: '正在连接教务系统…' });
+    let apiCredentials = null;
+    try {
+      apiCredentials = await this.vault.getSecret(VAULT_KEYS.academicApi);
+    } catch {
+      apiCredentials = null;
+    }
+    if (apiCredentials?.username && apiCredentials?.password && this._state?.settings?.academicApiEnabled !== false) {
+      try {
+        const { AcademicApiClient } = await import('../../core/academic-api-client.mjs');
+        const client = new AcademicApiClient({
+          username: apiCredentials.username,
+          password: apiCredentials.password,
+        });
+        this._campusClient = client;
+        await client.login();
+        this._auth = {
+          jwglxt: { connected: true, unchecked: false },
+          theol: { connected: this._state?.settings?.academicAuthMode !== 'api', unchecked: false },
+        };
+        this._academicApiCredentialStatus = { saved: true, encryptionAvailable: true, enabled: true };
+        this._credentialStatus = { saved: true, encryptionAvailable: true };
+        this.events.emit('auth-status', this._auth);
+        this.events.emit('sync-progress', { stage: 'all', status: 'done', label: '教务 API 登录成功' });
+        return;
+      } catch (error) {
+        console.warn('[theia-mobile] academic API login failed:', error);
+        this.events.emit('sync-progress', { stage: 'all', status: 'error', label: '教务 API 登录失败', error: error?.message || String(error) });
+        throw error;
+      }
+    }
+    // No real credentials configured — demo/mock login (stage 0 behavior)
     this._auth = { ...connectedStatus() };
     this._credentialStatus = { saved: true, encryptionAvailable: true };
     this._academicApiCredentialStatus = { saved: true, encryptionAvailable: true, enabled: true };
-    this._state.settings.academicApiEnabled = true;
+    if (this._state) this._state.settings.academicApiEnabled = true;
     await this._persist();
     this.events.emit('auth-status', this._auth);
-    // Trigger sync after login
     await this.syncNow();
   }
 
   async logout() {
+    this._campusClient = null;
+    this.session.clear();
     this._auth = { ...disconnectedStatus() };
     this.events.emit('auth-status', this._auth);
     // Leave data intact, just disconnect
@@ -580,11 +659,14 @@ export class MobileBridge {
   }
 
   async saveModelConfig(config) {
+    if (config.apiKey) {
+      await this.vault.setSecret(VAULT_KEYS.modelApiKey, config.apiKey);
+    }
     this._modelStatus = {
       configured: true,
       baseUrl: config.baseUrl || '',
       model: config.model || '',
-      apiKeySaved: Boolean(config.apiKey),
+      apiKeySaved: Boolean(config.apiKey) || this._modelStatus.apiKeySaved,
       encryptionAvailable: true,
     };
     if (this._state) {
@@ -599,6 +681,7 @@ export class MobileBridge {
   }
 
   async clearModelApiKey() {
+    await this.vault.removeSecret(VAULT_KEYS.modelApiKey);
     this._modelStatus.apiKeySaved = false;
     return { ...this._modelStatus };
   }
