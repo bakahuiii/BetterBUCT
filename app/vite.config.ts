@@ -51,7 +51,9 @@ export default defineConfig({
     port: 5175,
   },
   build: {
-    target: 'es2022',
+    // es2018 keeps output compatible with older Android WebViews; runtime
+    // APIs (structuredClone/Object.hasOwn/at) are polyfilled at startup.
+    target: 'es2018',
     outDir: 'dist',
     chunkSizeWarningLimit: 4096,
     rollupOptions: {

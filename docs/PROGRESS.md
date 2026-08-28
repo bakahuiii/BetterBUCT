@@ -48,7 +48,18 @@
 - [x] 深色模式（桌面 appearance 系统原生支持）
 - [x] 离线可用（本地 store + 缓存数据）
 - [x] 版本号 0.2.0（versionCode 2）
-- [ ] 真机测试（用户检查后按反馈调整）
+- [x] 真机测试反馈：模拟器白屏 → 已定位并修复（见下方排查记录）
+- [ ] 真机复测（fix1 APK）
+
+### 白屏排查记录（2026-08-28）
+- **根因**：桌面 `src/bridge.ts` 在模块求值时就调用 `structuredClone`；Android WebView < Chromium 98（2022 前）无此 API → 整包 JS 崩溃 → 白屏
+- **修复**：
+  - `install-mobile-bridge.mjs` 顶部加 `structuredClone` polyfill（JSON 方案，数据均 JSON 安全）
+  - 补 `Object.hasOwn` / `Array.prototype.at` / `String.prototype.replaceAll` polyfill
+  - Vite `build.target` es2022 → es2018（旧 WebView 语法兼容）
+  - 全局错误覆盖层：JS 崩溃时屏幕显示错误信息（不再白屏）
+- **验证**：native-sim 测试（headless Chrome 注入 fake Capacitor + Filesystem/Preferences 插件）→ dashboard/数据/FAB 全部渲染，无错误触发
+- **APK**：`release/THEIA-mobile-fix1-debug.apk`（107.1MB）
 
 ---
 
