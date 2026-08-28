@@ -427,3 +427,35 @@ html, body {
   height: 56px !important;
   border-radius: 18px !important;
 }
+
+/* ── 移动端隐藏 3D 视差场景（性能、省电） ─────────────────────── */
+@media (max-width: 720px) {
+  .theia-parallax-scene-host { display: none !important; }
+  .scene__canvas { display: none !important; }
+
+  /* 字体可读性 */
+  .timeline-row span, .task-row span, .exam-focus p, .exam-main h3 { font-size: 13px; }
+  .exam-date strong { font-size: 14px; }
+  .notice-compact strong { font-size: 14px; }
+  .notice-compact button { line-height: 1.5; }
+  .task-row strong { font-size: 15px; }
+  .data-table { font-size: 12px; }
+  .data-table th { font-size: 11px; }
+
+  /* 登录凭据弹窗 */
+  .credential-form { gap: 10px; }
+  .credential-form label { font-size: 13px; font-weight: 600; }
+  .secret-input { min-height: 44px; border-radius: 12px; }
+  .secret-input-field { font-size: 15px; }
+  .primary-button { min-height: 48px; font-size: 14px; border-radius: 14px; }
+
+  /* 设置页底部安全区 */
+  .settings-section { padding-bottom: calc(var(--theia-safe-bottom) + 60px) !important; }
+}
+
+/* 深色模式微调 */
+.dark .theia-mobile-action-sheet {
+  background: #1a2233 !important;
+  border-color: #2a3545 !important;
+}
+.dark .theia-pull-to-refresh { background: var(--canvas, #111820); }
