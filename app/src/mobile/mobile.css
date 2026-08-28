@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════
-   THEIA 移动版 UI 层 v2（mobile.css）
-   不改桌面源文件；覆盖桌面样式为手机 App 质感。基于桌面已有响应式
-   (@media ≤920px: .sidebar.open 抽屉 / .mobile-menu 汉堡 / .sidebar-scrim)。
+   THEIA 移动版 UI 层 v3（mobile.css）
+   不改桌面源文件；覆盖桌面样式为手机 App 质感。
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -10,7 +9,7 @@
   --theia-safe-left: env(safe-area-inset-left, 0px);
   --theia-safe-right: env(safe-area-inset-right, 0px);
   --theia-card-radius: 16px;
-  --theia-card-shadow: 0 1px 2px rgba(18,28,40,.05), 0 8px 24px -12px rgba(18,28,40,.16);
+  --theia-card-shadow: 0 1px 2px rgba(18,28,40,.04), 0 8px 24px -12px rgba(18,28,40,.16);
 }
 
 html, body {
@@ -24,12 +23,13 @@ html, body {
   /* ── 隐藏桌面标题栏，topbar 顶到屏幕顶部 ───────────────────── */
   .titlebar { display: none !important; }
 
-  /* ── 侧栏抽屉（桌面已用 .open 类驱动，这里只做质感） ───────── */
+  /* ── 侧栏抽屉 ──────────────────────────────────────────────── */
   .sidebar {
     width: min(320px, 88vw) !important;
     padding-top: calc(var(--theia-safe-top) + 24px) !important;
     border-radius: 0 20px 20px 0;
     box-shadow: 12px 0 48px -12px rgba(0,0,0,.5);
+    overflow-y: auto;
   }
   .sidebar-scrim { background: rgba(8,12,18,.45); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
   .sidebar .brand { padding-bottom: 20px; }
@@ -51,7 +51,7 @@ html, body {
   }
   .sidebar-collapse { display: none !important; }
 
-  /* ── Topbar：手机顶部条 ────────────────────────────────────── */
+  /* ── Topbar ─────────────────────────────────────────────────── */
   .topbar {
     position: sticky; top: 0; z-index: 30;
     min-height: calc(var(--theia-safe-top) + 56px);
@@ -92,51 +92,51 @@ html, body {
   }
   .workspace, .content-area, .sidebar { -webkit-overflow-scrolling: touch; }
 
-  /* ── Dashboard 卡片化 ──────────────────────────────────────── */
+  /* ── Dashboard ──────────────────────────────────────────────── */
   .dashboard-grid { gap: 14px; }
   .metric-strip {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 10px;
-    background: transparent; border: 0; box-shadow: none;
+    background: transparent !important; border: 0 !important; box-shadow: none !important;
   }
   .metric-strip button {
-    min-height: 96px;
+    min-height: 88px;
     padding: 14px 16px;
     background: var(--card, #fff) !important;
     border: 1px solid var(--line, #e2e7ec) !important;
     border-right: 1px solid var(--line, #e2e7ec) !important;
-    border-radius: var(--theia-card-radius);
+    border-radius: var(--theia-card-radius) !important;
     box-shadow: var(--theia-card-shadow);
   }
-  .metric-strip strong { font-size: 28px; }
+  .metric-strip strong { font-size: 26px; }
   .metric-strip span { font-size: 11px; }
 
   .quick-actions { grid-template-columns: 1fr 1fr !important; gap: 10px; }
   .quick-actions button {
-    min-height: 76px;
+    min-height: 72px;
     padding: 12px 14px;
-    border-radius: var(--theia-card-radius);
+    border-radius: var(--theia-card-radius) !important;
     box-shadow: var(--theia-card-shadow);
   }
   .quick-actions strong { font-size: 13px; }
   .quick-actions small { font-size: 11px; }
   .quick-action-icon { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 11px; }
 
-  /* 面板 */
+  /* 面板卡片 */
   .panel {
     padding: 16px;
     background: var(--card, #fff);
     border: 1px solid var(--line, #e2e7ec);
-    border-radius: var(--theia-card-radius);
+    border-radius: var(--theia-card-radius) !important;
     box-shadow: var(--theia-card-shadow);
   }
   .panel-heading { margin-bottom: 10px; padding-bottom: 10px; }
   .panel-heading h2, .section-heading h2 { font-size: 16px; }
   .eyebrow { font-size: 10px; }
 
-  /* 列表 */
-  .timeline-row, .task-row { min-height: 76px; padding: 12px 4px; }
+  /* 列表行 */
+  .timeline-row, .task-row { min-height: 72px; padding: 12px 4px; }
   .timeline-row strong, .task-row strong { font-size: 14px; }
   .timeline-row span, .task-row span { font-size: 12px; }
   .period-pill { min-height: 30px; padding: 0 10px; font-size: 11px; border-radius: 8px; }
@@ -159,7 +159,7 @@ html, body {
 
   /* ── 课表 ──────────────────────────────────────────────────── */
   .schedule-toolbar { margin-bottom: 14px; padding-bottom: 12px; }
-  .segmented button { min-height: 36px; font-size: 12px; padding: 0 13px; }
+  .segmented button { min-height: 36px; font-size: 12px; padding: 0 13px; border-radius: 8px; }
   .term-selector-group select, .selection-controls select, .selection-form input,
   .credential-form input, .model-service-form select, .numeric-setting input {
     min-height: 42px; font-size: 13px; border-radius: 10px;
@@ -181,9 +181,26 @@ html, body {
 
   /* ── 地图 ──────────────────────────────────────────────────── */
   .map-layer-controls, .map-zoom-controls { border-radius: 12px; }
+
+  /* ── 顾问 / 工具 ───────────────────────────────────────────── */
+  .settings-sidebar ~ div { width: 100% !important; }
+  .export-grid { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+  .export-grid button { min-height: 64px; border-radius: 14px; }
+  .setting-row, .numeric-setting { min-height: 50px; padding: 4px 0; }
+  .setting-row strong, .numeric-setting strong { font-size: 13px; }
+  .setting-row small, .numeric-setting small { font-size: 11px; }
+  .api-endpoint { border-radius: 10px; }
+  .data-table-wrap { overflow-x: auto; }
+  .data-table { font-size: 11px; }
+
+  /* ── 选课 ──────────────────────────────────────────────────── */
+  .selection-layout { grid-template-columns: 1fr !important; }
+  .selection-form, .selection-controls { gap: 8px; }
+  .selection-form label, .selection-controls label { font-size: 12px; }
+  [class*="candidate"] { border-radius: 14px; }
 }
 
-/* ── 触控目标与通用（≤920 也生效，抽屉场景） ─────────────────── */
+/* ── 触控（≤920 也生效） ──────────────────────────────────────── */
 @media (max-width: 920px) {
   button, a, [role="button"], .sidebar nav button, .icon-button,
   .task-command, .quick-actions button, .notice-compact button {
@@ -193,7 +210,31 @@ html, body {
   .topbar .icon-button { min-height: 42px; min-width: 42px; }
 }
 
-/* ── 移动端 FAB / 操作条（所有视口） ─────────────────────────── */
+/* ── 深色模式微调 ──────────────────────────────────────────────── */
+.dark .topbar {
+  background: color-mix(in srgb, var(--card, #1a2230) 88%, transparent) !important;
+}
+.dark .panel {
+  background: var(--card, #1a2230) !important;
+  border-color: var(--border, #2a3545) !important;
+}
+.dark .metric-strip button {
+  background: var(--card, #1a2230) !important;
+  border-color: var(--border, #2a3545) !important;
+}
+.dark .quick-actions button {
+  background: var(--card, #1a2230) !important;
+  border-color: var(--border, #2a3545) !important;
+}
+.dark .mobile-menu {
+  background: var(--muted, #253241) !important;
+  color: var(--sidebar-foreground, #dbe4e5) !important;
+}
+.dark .theia-mobile-fab {
+  background: linear-gradient(135deg, #1d8278, #259c90) !important;
+}
+
+/* ── 移动端 FAB / 操作条 ──────────────────────────────────────── */
 .theia-mobile-actions {
   position: fixed;
   right: calc(var(--theia-safe-right) + 14px);
@@ -203,15 +244,16 @@ html, body {
 }
 .theia-mobile-fab {
   width: 56px; height: 56px;
-  border-radius: 19px;
+  border-radius: 18px;
   background: linear-gradient(135deg, #176c64, #1d8278);
   color: #fff;
   display: flex; align-items: center; justify-content: center;
   border: none;
   box-shadow: 0 10px 28px -6px rgba(23,108,100,.55), 0 2px 6px rgba(18,28,40,.2);
   cursor: pointer;
+  transition: transform .14s ease;
 }
-.theia-mobile-fab:active { transform: scale(.95); }
+.theia-mobile-fab:active { transform: scale(.92); }
 .theia-mobile-action-sheet {
   display: flex; flex-direction: column; gap: 4px;
   background: var(--card, #1a2233);
@@ -232,7 +274,7 @@ html, body {
 .theia-mobile-action-sheet button:disabled { opacity: .5; }
 .spin { animation: theia-spin .8s linear infinite; }
 
-/* 下拉刷新指示器 */
+/* 下拉刷新 */
 .theia-pull-to-refresh {
   display: flex; align-items: center; justify-content: center;
   height: 0; overflow: hidden;
@@ -250,3 +292,115 @@ html, body {
   animation: theia-spin .6s linear infinite;
 }
 @keyframes theia-spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════════════════════════
+   v4 — 通讯/表格/弹窗的移动端适配
+   ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 720px) {
+
+  /* 通知 + 邮箱：单列堆叠 */
+  .communications-view {
+    grid-template-columns: 1fr !important;
+    gap: 14px;
+    min-height: 0 !important;
+  }
+  .communications-pane {
+    max-height: none !important;
+    min-height: 0 !important;
+    border-radius: var(--theia-card-radius) !important;
+  }
+  .communications-pane-content {
+    max-height: 58vh !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .communications-pane-heading { min-height: 64px; padding: 12px 16px; }
+  .communications-pane-title h2 { font-size: 16px; }
+  .notice-detail-dialog, .mail-detail-dialog {
+    width: calc(100vw - 24px) !important;
+    max-width: 480px;
+    border-radius: 18px;
+  }
+  .notice-detail-body, .mail-detail-body { max-height: 60vh !important; overflow-y: auto; }
+
+  /* 表格横向滚动 */
+  .free-classroom-table-wrap,
+  .school-schedule-table-wrap,
+  .venue-status-table-wrap,
+  .requirement-course-table-wrap,
+  .academic-records-table-wrap,
+  .selection-candidate-table-wrap,
+  .selection-plan-queue-table-wrap,
+  .data-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* 课表横向滚动容器 */
+  .schedule-scroll { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+  .schedule-board { min-width: 920px; }
+  .schedule-toolbar-main { flex-wrap: wrap; gap: 8px; }
+  .week-picker { width: 100%; min-height: 42px; }
+  .week-picker input { min-height: 42px; font-size: 13px; }
+
+  /* 设置弹窗：全屏 */
+  .settings-dialog {
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+  .settings-dialog-scroll { padding: 12px 14px !important; }
+  .settings-dialog-header { min-height: calc(var(--theia-safe-top) + 56px); padding-top: var(--theia-safe-top); }
+  .settings-section { padding: 14px 4px !important; }
+  .settings-modal-nav { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .settings-nav-bottom { display: none; }
+
+  /* 工具页 Tab 横滚 */
+  .tools-tab-bar, .tools-subtab-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tools-tab-bar::-webkit-scrollbar, .tools-subtab-bar::-webkit-scrollbar { display: none; }
+
+  /* 选课页 */
+  .selection-catalog-toolbar, .selection-controls { flex-wrap: wrap; }
+  .selection-number-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+  .selection-command { min-height: 44px; }
+
+  /* 空闲教室 / 场馆查询表单 */
+  .free-classroom-form-grid, .venue-status-query-grid { grid-template-columns: 1fr !important; gap: 8px; }
+  .free-classroom-query select, .free-classroom-query input,
+  .venue-status-query select, .venue-status-query input {
+    min-height: 42px; font-size: 13px; border-radius: 10px;
+  }
+
+  /* 顾问 */
+  .advisor-summary-grid, .advisor-action-grid { grid-template-columns: 1fr !important; gap: 8px; }
+  .advisor-view { padding: 0; }
+
+  /* 学业进度 */
+  .progress-summary { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .requirement-node-head { grid-template-columns: 1fr !important; gap: 6px; }
+  .requirement-meter { min-height: 44px; }
+
+  /* 课程列表 */
+  .course-grid { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .course-card { border-radius: var(--theia-card-radius) !important; }
+
+  /* 通用输入控件 */
+  select, input[type="text"], input[type="number"], input[type="password"], input[type="search"], textarea {
+    font-size: 16px; /* 防 iOS 缩放 */
+  }
+  .segmented { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* 暗色通讯面板 */
+.dark .communications-pane {
+  background: color-mix(in srgb, var(--card, #1a2230) 80%, transparent) !important;
+  border-color: color-mix(in srgb, var(--border, #2a3545) 80%, transparent) !important;
+}
