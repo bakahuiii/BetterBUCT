@@ -1,0 +1,59 @@
+/* THEIA 移动版覆盖样式（仅移动端加载，不改桌面源文件）
+   - 适配 WebView 安全区 / 触控
+   - 让桌面布局在窄屏下保持可用
+*/
+:root {
+  --theia-safe-top: env(safe-area-inset-top, 0px);
+  --theia-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --theia-safe-left: env(safe-area-inset-left, 0px);
+  --theia-safe-right: env(safe-area-inset-right, 0px);
+}
+
+html, body {
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 禁止 WebView 双击缩放 / 长按菜单干扰 */
+* {
+  -webkit-user-select: text;
+}
+button, a, [role="button"] {
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* 侧栏在移动端默认全屏浮层，触控目标加大 */
+.app-shell .sidebar {
+  width: min(320px, 86vw) !important;
+}
+.app-shell.sidebar-is-collapsed .sidebar {
+  transform: translateX(-110%);
+}
+.app-shell.sidebar-is-collapsed .app-body {
+  margin-left: 0 !important;
+}
+
+/* 顶部栏加安全区 */
+.titlebar {
+  padding-top: max(env(safe-area-inset-top, 0px), 0.5rem) !important;
+}
+
+/* 底部内容避免被手势条遮挡 */
+.app-body {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+/* 触控目标最小高度 */
+button, a, [role="button"], .nav-item, .workspace-toolbar button {
+  min-height: 40px;
+}
+
+/* 大列表区域允许内部滚动 */
+@media (max-width: 720px) {
+  .workspace {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

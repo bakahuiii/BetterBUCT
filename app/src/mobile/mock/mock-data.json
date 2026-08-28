@@ -1,0 +1,592 @@
+{
+  "schema": "theia-campus-data/v1",
+  "appVersion": "0.4.4",
+  "createdAt": "2026-08-28T04:03:53.567Z",
+  "updatedAt": "2026-08-28T04:03:53.567Z",
+  "profile": {
+    "name": "校园用户",
+    "studentId": "2026000000"
+  },
+  "terms": [
+    {
+      "id": "2026-3",
+      "year": 2026,
+      "term": "3",
+      "label": "2026-2027 第一学期"
+    },
+    {
+      "id": "2026-12",
+      "year": 2026,
+      "term": "12",
+      "label": "2026-2027 第二学期"
+    },
+    {
+      "id": "2026-16",
+      "year": 2026,
+      "term": "16",
+      "label": "2026-2027 第三学期"
+    }
+  ],
+  "courses": [
+    {
+      "id": "C001",
+      "code": "C001",
+      "title": "高等数学 A",
+      "teacher": "李老师",
+      "source": "theol",
+      "sourceUrl": "https://course.buct.edu.cn/"
+    },
+    {
+      "id": "C002",
+      "code": "C002",
+      "title": "大学物理",
+      "teacher": "周老师",
+      "source": "theol",
+      "sourceUrl": "https://course.buct.edu.cn/"
+    },
+    {
+      "id": "C003",
+      "code": "C003",
+      "title": "程序设计基础",
+      "teacher": "陈老师",
+      "source": "theol",
+      "sourceUrl": "https://course.buct.edu.cn/"
+    },
+    {
+      "id": "C004",
+      "code": "C004",
+      "title": "大学英语",
+      "teacher": "王老师",
+      "source": "theol",
+      "sourceUrl": "https://course.buct.edu.cn/"
+    }
+  ],
+  "schedule": [
+    {
+      "id": "s1",
+      "title": "高等数学 A",
+      "teacher": "李老师",
+      "room": "昌平 A-203",
+      "weekday": 1,
+      "period": "1-2",
+      "weeks": "1-16周"
+    },
+    {
+      "id": "s2",
+      "title": "程序设计基础",
+      "teacher": "陈老师",
+      "room": "昌平 B-405",
+      "weekday": 1,
+      "period": "5-6",
+      "weeks": "1-16周"
+    },
+    {
+      "id": "s3",
+      "title": "大学物理",
+      "teacher": "周老师",
+      "room": "昌平 A-108",
+      "weekday": 2,
+      "period": "3-4",
+      "weeks": "1-16周"
+    },
+    {
+      "id": "s4",
+      "title": "大学英语",
+      "teacher": "王老师",
+      "room": "昌平 C-301",
+      "weekday": 3,
+      "period": "1-2",
+      "weeks": "1-16周"
+    },
+    {
+      "id": "s5",
+      "title": "程序设计基础",
+      "teacher": "陈老师",
+      "room": "机房 4",
+      "weekday": 4,
+      "period": "7-8",
+      "weeks": "1-12周"
+    },
+    {
+      "id": "s6",
+      "title": "大学物理实验",
+      "teacher": "赵老师",
+      "room": "实验楼 212",
+      "weekday": 5,
+      "period": "5-8",
+      "weeks": "2-14双周"
+    }
+  ],
+  "exams": [
+    {
+      "id": "e1",
+      "courseName": "高等数学 A",
+      "examType": "期末考试",
+      "examTime": "2026-09-02T04:03:53.567Z",
+      "startAt": "2026-09-02T04:03:53.567Z",
+      "location": "昌平主教 302",
+      "campus": "昌平校区",
+      "seat": "18",
+      "mode": "闭卷",
+      "sourceUrl": "https://jwglxt.buct.edu.cn/"
+    },
+    {
+      "id": "e2",
+      "courseName": "大学物理",
+      "examType": "期末考试",
+      "examTime": "2026-09-07T04:03:53.567Z",
+      "startAt": "2026-09-07T04:03:53.567Z",
+      "location": "昌平主教 105",
+      "campus": "昌平校区",
+      "seat": "07",
+      "mode": "闭卷",
+      "sourceUrl": "https://jwglxt.buct.edu.cn/"
+    }
+  ],
+  "grades": [
+    {
+      "id": "g1",
+      "termId": "2026-3",
+      "courseName": "线性代数 B",
+      "courseCode": "MATH102",
+      "nature": "必修",
+      "credits": 3,
+      "score": "92",
+      "point": 4.2,
+      "teacher": "刘老师"
+    },
+    {
+      "id": "g2",
+      "termId": "2026-12",
+      "courseName": "大学英语 II",
+      "courseCode": "ENG102",
+      "nature": "必修",
+      "credits": 2,
+      "score": "86",
+      "point": 3.6,
+      "teacher": "张老师"
+    },
+    {
+      "id": "g3",
+      "termId": "2026-16",
+      "courseName": "思想道德与法治",
+      "courseCode": "POL101",
+      "nature": "必修",
+      "credits": 3,
+      "score": "88",
+      "point": 3.8,
+      "teacher": "孙老师"
+    },
+    {
+      "id": "g4",
+      "termId": "2026-16",
+      "courseName": "大学计算机基础",
+      "courseCode": "CS101",
+      "nature": "必修",
+      "credits": 2,
+      "score": "优秀",
+      "point": 4.5,
+      "teacher": "马老师"
+    }
+  ],
+  "selectedCourses": [
+    {
+      "id": "selected-1",
+      "termId": "2026-3",
+      "courseId": "C001",
+      "courseCode": "C001",
+      "classId": "JX001",
+      "title": "高等数学 A",
+      "teacher": "李老师",
+      "credits": 5,
+      "category": "公共基础必修",
+      "location": "昌平 A-203",
+      "time": "周一 1-2 节"
+    },
+    {
+      "id": "selected-2",
+      "termId": "2026-3",
+      "courseId": "C002",
+      "courseCode": "C002",
+      "classId": "JX002",
+      "title": "大学物理",
+      "teacher": "周老师",
+      "credits": 4,
+      "category": "专业基础必修",
+      "location": "昌平 B-101",
+      "time": "周二 3-4 节"
+    }
+  ],
+  "academicProgress": {
+    "gpa": 3.42,
+    "courseCounts": {
+      "planned": {
+        "total": 160,
+        "passed": 38,
+        "failed": 0,
+        "notTaken": 108,
+        "studying": 14
+      },
+      "outsidePlan": {
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    "categories": [
+      {
+        "id": "progress-1",
+        "title": "公共基础必修",
+        "required": 66.5,
+        "earned": 40,
+        "remaining": 26.5,
+        "status": "学分未满"
+      },
+      {
+        "id": "progress-2",
+        "title": "专业基础必修",
+        "required": 42,
+        "earned": 18,
+        "remaining": 24,
+        "status": "学分未满"
+      },
+      {
+        "id": "progress-3",
+        "title": "素质教育课程",
+        "required": 12,
+        "earned": 8,
+        "remaining": 4,
+        "status": "学分未满"
+      }
+    ],
+    "sourceUrl": "https://jwglxt.buct.edu.cn/jwglxt/xsxy/xsxyqk_cxXsxyqkIndex.html?gnmkdm=N105515&layout=default"
+  },
+  "assignments": [
+    {
+      "id": "a1",
+      "courseId": "C003",
+      "courseName": "程序设计基础",
+      "title": "第三章循环结构练习",
+      "dueAt": "2026-08-29T10:03:53.567Z",
+      "status": "pending",
+      "sourceUrl": "https://course.buct.edu.cn/"
+    },
+    {
+      "id": "a2",
+      "courseId": "C001",
+      "courseName": "高等数学 A",
+      "title": "习题册 2.1-2.4",
+      "dueAt": "2026-08-30T10:03:53.567Z",
+      "status": "pending",
+      "sourceUrl": "https://course.buct.edu.cn/"
+    },
+    {
+      "id": "a3",
+      "courseId": "C004",
+      "courseName": "大学英语",
+      "title": "Unit 3 在线测试",
+      "dueAt": "2026-08-31T12:03:53.567Z",
+      "status": "submitted",
+      "score": 91,
+      "sourceUrl": "https://course.buct.edu.cn/"
+    }
+  ],
+  "workspaces": [],
+  "notices": [
+    {
+      "id": "n1",
+      "title": "关于本学期考试安排查询的通知",
+      "summary": "考试安排已经发布，请及时确认考试时间和地点。",
+      "publishedAt": "2026-08-27T18:03:53.567Z",
+      "source": "jwglxt",
+      "sourceUrl": "https://jwglxt.buct.edu.cn/"
+    },
+    {
+      "id": "n2",
+      "title": "程序设计基础课程资料已更新",
+      "summary": "第三章课件与示例代码已经上传。",
+      "publishedAt": "2026-08-27T10:03:53.567Z",
+      "source": "theol",
+      "sourceUrl": "https://course.buct.edu.cn/"
+    }
+  ],
+  "emails": [],
+  "dataCatalog": {
+    "schema": "theia-local-data/v1",
+    "updatedAt": null,
+    "collections": {
+      "fitness": {
+        "source": "https://tygl.buct.edu.cn/",
+        "parserVersion": "tygl-fitness/v1",
+        "lastRefreshedAt": null,
+        "availableYears": [],
+        "records": {}
+      },
+      "schoolSchedule": {
+        "source": "https://jwglxt.buct.edu.cn/jwglxt/",
+        "parserVersion": "jwglxt-school-schedule/v8",
+        "lastRefreshedAt": null,
+        "records": {}
+      },
+      "academicCalendar": {
+        "source": "https://jiaowuchu.buct.edu.cn/",
+        "parserVersion": "academic-calendar-assets/v1",
+        "lastRefreshedAt": null,
+        "assets": {},
+        "calendar": null,
+        "calendarError": null,
+        "analysis": null,
+        "analysisError": null
+      },
+      "venueReservations": {
+        "source": "https://motion.buct.edu.cn/changguanyuyue1/",
+        "parserVersion": "motion-venue/v1",
+        "lastRefreshedAt": "2026-08-28T04:03:53.565Z",
+        "campuses": [
+          {
+            "id": "changping",
+            "label": "昌平校区",
+            "venueIds": [
+              "motion-venue-badminton-changping",
+              "motion-venue-badminton-training"
+            ]
+          }
+        ],
+        "venues": [
+          {
+            "id": "motion-venue-badminton-changping",
+            "campusId": "changping",
+            "campusLabel": "昌平校区",
+            "activity": "羽毛球",
+            "label": "体育馆比赛馆",
+            "detailUrl": "https://motion.buct.edu.cn/changguanyuyue1/detail.php?xm=%E7%BE%BD%E6%AF%9B%E7%90%83&xq=0"
+          },
+          {
+            "id": "motion-venue-badminton-training",
+            "campusId": "changping",
+            "campusLabel": "昌平校区",
+            "activity": "羽毛球",
+            "label": "体育馆训练馆",
+            "detailUrl": "https://motion.buct.edu.cn/changguanyuyue1/detail.php?xm=%E7%BE%BD%E6%AF%9B%E7%90%83&xq=0"
+          }
+        ],
+        "statuses": {
+          "https%3A%2F%2Fmotion.buct.edu.cn%2Fchangguanyuyue1%2Fdetail.php%3Fxm%3D%25E7%25BE%25BD%25E6%25AF%259B%25E7%2590%2583%26xq%3D0|2026-08-28|%E4%BD%93%E8%82%B2%E9%A6%86%E6%AF%94%E8%B5%9B%E9%A6%86": {
+            "id": "motion-status:https%3A%2F%2Fmotion.buct.edu.cn%2Fchangguanyuyue1%2Fdetail.php%3Fxm%3D%25E7%25BE%25BD%25E6%25AF%259B%25E7%2590%2583%26xq%3D0|2026-08-28|%E4%BD%93%E8%82%B2%E9%A6%86%E6%AF%94%E8%B5%9B%E9%A6%86",
+            "scope": {
+              "detailUrl": "https://motion.buct.edu.cn/changguanyuyue1/detail.php?xm=%E7%BE%BD%E6%AF%9B%E7%90%83&xq=0",
+              "date": "2026-08-28",
+              "venue": "体育馆比赛馆"
+            },
+            "capturedAt": "2026-08-28T04:03:53.565Z",
+            "source": "https://motion.buct.edu.cn/changguanyuyue1/",
+            "parserVersion": "motion-venue/v1",
+            "result": {
+              "schema": "theia-motion-venue-status/v1",
+              "parserVersion": "motion-venue/v1",
+              "capturedAt": "2026-08-28T04:03:53.565Z",
+              "source": {
+                "platform": "MOTION",
+                "accessMode": "public-anonymous-get",
+                "url": "https://motion.buct.edu.cn/changguanyuyue1/detail.php?xm=%E7%BE%BD%E6%AF%9B%E7%90%83&xq=0",
+                "queryUrl": "https://motion.buct.edu.cn/changguanyuyue1/detail.php?xm=%E7%BE%BD%E6%AF%9B%E7%90%83&xq=0",
+                "method": "GET"
+              },
+              "query": {
+                "activity": "羽毛球",
+                "campus": {
+                  "id": "changping",
+                  "label": "昌平校区"
+                },
+                "detailUrl": "https://motion.buct.edu.cn/changguanyuyue1/detail.php?xm=%E7%BE%BD%E6%AF%9B%E7%90%83&xq=0",
+                "date": "2026-08-28",
+                "venue": "体育馆比赛馆",
+                "availableDates": [
+                  "2026-08-28",
+                  "2026-08-20",
+                  "2026-08-21"
+                ],
+                "availableVenues": [
+                  "体育馆比赛馆",
+                  "体育馆训练馆"
+                ]
+              },
+              "availability": {
+                "tables": [
+                  {
+                    "index": 0,
+                    "headers": [
+                      "时间\\场地",
+                      "羽01",
+                      "羽02",
+                      "羽03"
+                    ],
+                    "slots": [
+                      {
+                        "time": "08:00-09:00",
+                        "courts": [
+                          {
+                            "court": "羽01",
+                            "status": "可预约",
+                            "state": "available"
+                          },
+                          {
+                            "court": "羽02",
+                            "status": "已占用",
+                            "state": "occupied"
+                          },
+                          {
+                            "court": "羽03",
+                            "status": "可预约",
+                            "state": "available"
+                          }
+                        ]
+                      },
+                      {
+                        "time": "09:00-10:00",
+                        "courts": [
+                          {
+                            "court": "羽01",
+                            "status": "可预约",
+                            "state": "available"
+                          },
+                          {
+                            "court": "羽02",
+                            "status": "已占用",
+                            "state": "occupied"
+                          },
+                          {
+                            "court": "羽03",
+                            "status": "闭馆",
+                            "state": "closed"
+                          }
+                        ]
+                      },
+                      {
+                        "time": "10:00-11:00",
+                        "courts": [
+                          {
+                            "court": "羽01",
+                            "status": "已过期",
+                            "state": "expired"
+                          },
+                          {
+                            "court": "羽02",
+                            "status": "可预约",
+                            "state": "available"
+                          },
+                          {
+                            "court": "羽03",
+                            "status": "可预约",
+                            "state": "available"
+                          }
+                        ]
+                      },
+                      {
+                        "time": "11:00-12:00",
+                        "courts": [
+                          {
+                            "court": "羽01",
+                            "status": "可预约",
+                            "state": "available"
+                          },
+                          {
+                            "court": "羽02",
+                            "status": "已选定",
+                            "state": "selected"
+                          },
+                          {
+                            "court": "羽03",
+                            "status": "可预约",
+                            "state": "available"
+                          }
+                        ]
+                      }
+                    ],
+                    "summary": {
+                      "timeSlots": 4,
+                      "courtStatusCells": 12
+                    }
+                  }
+                ],
+                "summary": {
+                  "timeSlots": 4,
+                  "courtStatusCells": 12,
+                  "byState": {
+                    "available": 7,
+                    "occupied": 2,
+                    "closed": 1,
+                    "expired": 1,
+                    "selected": 1
+                  }
+                }
+              },
+              "safety": {
+                "onlyRead": true,
+                "requestedMethods": [
+                  "GET"
+                ],
+                "submittedForms": 0,
+                "executedBookingActions": 0,
+                "credentialsOrCookiesSupplied": false,
+                "rawBodyPersisted": false
+              },
+              "timing": {
+                "totalMs": 245.5,
+                "initialRequestMs": 112.3,
+                "selectedRequestMs": 131.7,
+                "selectedPageFetched": true
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "sync": {
+    "lastStartedAt": "2026-08-28T03:57:53.567Z",
+    "lastCompletedAt": "2026-08-28T04:00:53.567Z",
+    "lastRunAt": "2026-08-28T04:00:53.567Z",
+    "lastSuccessAt": "2026-08-28T04:00:53.567Z",
+    "lastError": null,
+    "runId": "demo",
+    "sources": {
+      "jwglxt": {
+        "connected": true
+      },
+      "theol": {
+        "connected": true
+      }
+    },
+    "domains": {}
+  },
+  "settings": {
+    "apiPort": 8765,
+    "syncIntervalMinutes": 30,
+    "autoSync": false,
+    "openOriginalInApp": true,
+    "academicAuthMode": "unified",
+    "academicApiEnabled": false,
+    "mail": {
+      "enabled": false,
+      "pollIntervalMinutes": 5
+    },
+    "modelBaseUrl": "",
+    "modelProvider": "openai-compatible",
+    "modelName": "",
+    "modelModels": [],
+    "modelRouting": {
+      "advisorFastModel": null,
+      "advisorDeepModel": null,
+      "courseworkModel": null,
+      "fallbackModel": null
+    },
+    "advisorConfig": {
+      "permissionMode": "read-only",
+      "reasoningEffort": "medium",
+      "responseStyle": "balanced",
+      "responseLength": "adaptive",
+      "temperature": 1,
+      "budgetLevel": "high"
+    }
+  }
+}

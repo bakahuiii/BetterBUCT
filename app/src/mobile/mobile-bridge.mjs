@@ -1,0 +1,735 @@
+// window.theia mobile bridge implementation
+// Implements the TheiaBridge contract (see src/types.ts) for the Capacitor WebView.
+import { MobileStore } from './store/mobile-store.mjs';
+import { createWebStorageBackend } from './store/web-storage-backend.mjs';
+// Native backend is imported dynamically when Capacitor is available
+// import { createCapacitorFilesystemBackend } from './store/capacitor-filesystem-backend.mjs';
+import { mockState } from './mock/mock-data.mjs';
+
+// ── Event Bus ──────────────────────────────────────────────────────────────
+class EventBus {
+  constructor() {
+    this._listeners = new Map();
+  }
+  on(event, cb) {
+    if (!this._listeners.has(event)) this._listeners.set(event, new Set());
+    this._listeners.get(event).add(cb);
+    return () => this._listeners.get(event)?.delete(cb);
+  }
+  emit(event, ...args) {
+    const set = this._listeners.get(event);
+    if (!set) return;
+    for (const cb of set) {
+      try { cb(...args); } catch { /* ignore */ }
+    }
+  }
+  has(event) {
+    return this._listeners.has(event) && this._listeners.get(event).size > 0;
+  }
+}
+
+// ── Auth Helpers ───────────────────────────────────────────────────────────
+function disconnectedStatus() {
+  return {
+    jwglxt: { connected: false, unchecked: true },
+    theol: { connected: false, unchecked: true },
+  };
+}
+
+function connectedStatus() {
+  return {
+    jwglxt: { connected: true, unchecked: false },
+    theol: { connected: true, unchecked: false },
+  };
+}
+
+// ── Mobile Bridge Class ────────────────────────────────────────────────────
+export class MobileBridge {
+  constructor({ storageBackend } = {}) {
+    this.events = new EventBus();
+    this.backend = storageBackend || createWebStorageBackend();
+    this.store = new MobileStore(this.backend);
+    this._state = null;
+    this._auth = { ...disconnectedStatus(), };
+    this._syncing = false;
+    this._syncProgress = null;
+    this._credentialStatus = { saved: false, encryptionAvailable: false };
+    this._academicApiCredentialStatus = { saved: false, encryptionAvailable: false, enabled: false };
+    this._mailCredentialStatus = { saved: false, encryptionAvailable: false };
+    this._modelStatus = {
+      configured: false,
+      baseUrl: '',
+      model: '',
+      apiKeySaved: false,
+      encryptionAvailable: false,
+    };
+    this._courseSelection = { active: null, updatedAt: new Date().toISOString() };
+    this._courseWorkQueue = { schema: 'theia-course-work-queue/v1', enabled: false, updatedAt: new Date().toISOString(), jobs: [] };
+    this._initialized = false;
+    this._initPromise = null;
+  }
+
+  async init() {
+    if (this._initialized) return;
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = this._doInit();
+    return this._initPromise;
+  }
+
+  async _doInit() {
+    try {
+      const loaded = await this.store.load();
+      if (loaded) {
+        // Validate loaded state has essential fields
+        this._state = loaded;
+        // If no auth, default disconnected
+        this._auth = { ...disconnectedStatus() };
+        // If credential status was saved, restore
+        if (this._state.settings?.academicApiEnabled) {
+          this._academicApiCredentialStatus.saved = true;
+        }
+      }
+    } catch (error) {
+      console.warn('[theia-mobile] store load failed, using mock:', error);
+    }
+    if (!this._state) {
+      // Seed with mock data for first-run or demo
+      await this._seedMockData();
+    }
+    this._initialized = true;
+    this.events.emit('snapshot', this._state);
+    this.events.emit('auth-status', this._auth);
+  }
+
+  async _seedMockData() {
+    this._state = structuredClone(mockState);
+    this._state.appVersion = '0.5.1-mobile';
+    this._state.createdAt = new Date().toISOString();
+    this._state.updatedAt = this._state.createdAt;
+    await this._persist();
+  }
+
+  async _persist() {
+    if (this._state) {
+      this._state.updatedAt = new Date().toISOString();
+      await this.store.save(this._state);
+    }
+  }
+
+  _publishState() {
+    if (!this._state) return;
+    const snapshot = structuredClone(this._state);
+    this.events.emit('snapshot', snapshot);
+  }
+
+  // ── Bridge Methods (TheiaBridge contract) ──────────────────────────────
+
+  async getSnapshot() {
+    await this.init();
+    return structuredClone(this._state);
+  }
+
+  async getRendererSnapshot() {
+    await this.init();
+    // projectBrowserRendererSnapshot is applied by the UI; we return raw state
+    return structuredClone(this._state);
+  }
+
+  async getUserDataOverview() {
+    await this.init();
+    // Re-export from desktop user-data-view
+    const { projectBrowserUserDataOverview } = await import('../user-data-view');
+    return projectBrowserUserDataOverview(this._state);
+  }
+
+  async getUserDataDomainSummary(domain) {
+    await this.init();
+    const { projectBrowserUserDataDomainSummary } = await import('../user-data-view');
+    return projectBrowserUserDataDomainSummary(this._state, domain);
+  }
+
+  async getUserDataRecords(domain, options) {
+    await this.init();
+    const { projectBrowserUserDataRecords } = await import('../user-data-view');
+    const page = projectBrowserUserDataRecords(this._state, domain, options);
+    if (!page) throw new Error('资料域不存在');
+    return page;
+  }
+
+  async getAdvisorOverview() {
+    throw new Error('顾问概览在移动端开发中');
+  }
+
+  async getAdvisorAcademicWhatIf() {
+    throw new Error('顾问情景计算在移动端开发中');
+  }
+
+  async getAdvisorCourseDecisions() {
+    throw new Error('顾问选课分析在移动端开发中');
+  }
+
+  async executeAdvisorAction() {
+    throw new Error('顾问动作在移动端开发中');
+  }
+
+  async listAdvisorThreads() {
+    return [];
+  }
+
+  async createAdvisorThread() {
+    throw new Error('模型顾问在移动端开发中');
+  }
+
+  async prepareAdvisorRequest() {
+    throw new Error('模型顾问在移动端开发中');
+  }
+
+  async sendAdvisorRequest() {
+    throw new Error('模型顾问在移动端开发中');
+  }
+
+  async cancelAdvisorRequest() {
+    return { cancelled: false, requestId: null };
+  }
+
+  async deleteAdvisorThread(threadId) {
+    return { deleted: false, threadId };
+  }
+
+  onAdvisorStream() {
+    return () => undefined;
+  }
+
+  async getActivityLog() {
+    return [];
+  }
+
+  async getIrisStatus() {
+    return {
+      schema: 'theia-iris-companion/v1',
+      enabled: false,
+      configured: false,
+      encryptionAvailable: false,
+      running: false,
+      pid: null,
+      startedAt: null,
+      lastExit: null,
+      lastError: null,
+      visibleProviders: ['theia'],
+      providers: { theia: false },
+    };
+  }
+
+  async saveIrisSettings() { throw new Error('Iris 桌面专属'); }
+  async openIrisControlPanel() { throw new Error('Iris 桌面专属'); }
+  async saveIrisCredentials() { throw new Error('Iris 桌面专属'); }
+  async clearIrisCredentials() { throw new Error('Iris 桌面专属'); }
+  async startIris() { throw new Error('Iris 桌面专属'); }
+  async stopIris() { throw new Error('Iris 桌面专属'); }
+  async restartIris() { throw new Error('Iris 桌面专属'); }
+
+  async getAuthStatus() {
+    await this.init();
+    return { ...this._auth };
+  }
+
+  async getCredentialStatus() {
+    return { ...this._credentialStatus };
+  }
+
+  async getAcademicApiCredentialStatus() {
+    return { ...this._academicApiCredentialStatus };
+  }
+
+  async getMailCredentialStatus() {
+    return { ...this._mailCredentialStatus };
+  }
+
+  async readSavedSecret(kind) {
+    // In real mobile, read from Keystore via Capacitor plugin
+    throw new Error('安全存储凭据查看在移动端开发中');
+  }
+
+  async saveCredentials(credentials) {
+    await this.init();
+    this._credentialStatus = { saved: true, encryptionAvailable: true };
+    this._auth = { ...this._auth, ...connectedStatus() };
+    this._state.settings.academicApiEnabled = true;
+    await this._persist();
+    this.events.emit('auth-status', this._auth);
+    return { ...this._credentialStatus };
+  }
+
+  async saveAcademicApiCredentials(credentials) {
+    await this.init();
+    this._academicApiCredentialStatus = { saved: true, encryptionAvailable: true, enabled: true };
+    this._state.settings.academicApiEnabled = true;
+    await this._persist();
+    return { ...this._academicApiCredentialStatus };
+  }
+
+  async clearCredentials() {
+    this._credentialStatus = { saved: false, encryptionAvailable: false };
+    this._academicApiCredentialStatus = { saved: false, encryptionAvailable: false, enabled: false };
+    this._auth = { ...disconnectedStatus() };
+    if (this._state) this._state.settings.academicApiEnabled = false;
+    await this._persist();
+    this.events.emit('auth-status', this._auth);
+    return { ...this._credentialStatus };
+  }
+
+  async clearAcademicApiCredentials() {
+    this._academicApiCredentialStatus = { saved: false, encryptionAvailable: false, enabled: false };
+    if (this._state) this._state.settings.academicApiEnabled = false;
+    await this._persist();
+    return { ...this._academicApiCredentialStatus };
+  }
+
+  async saveMailCredentials(credentials) {
+    this._mailCredentialStatus = { saved: true, encryptionAvailable: true };
+    if (this._state) this._state.settings.mail.enabled = true;
+    await this._persist();
+    return { ...this._mailCredentialStatus };
+  }
+
+  async clearMailCredentials() {
+    this._mailCredentialStatus = { saved: false, encryptionAvailable: false };
+    if (this._state) this._state.settings.mail.enabled = false;
+    await this._persist();
+    return { ...this._mailCredentialStatus };
+  }
+
+  async refreshMailbox() {
+    throw new Error('校园邮箱在移动端开发中');
+  }
+
+  async openMailbox() {
+    throw new Error('校园邮箱在移动端开发中');
+  }
+
+  async readMailboxMessage() {
+    throw new Error('校园邮箱在移动端开发中');
+  }
+
+  async downloadMailboxAttachment() {
+    throw new Error('校园邮箱在移动端开发中');
+  }
+
+  async login() {
+    await this.init();
+    this._auth = { ...connectedStatus() };
+    this._credentialStatus = { saved: true, encryptionAvailable: true };
+    this._academicApiCredentialStatus = { saved: true, encryptionAvailable: true, enabled: true };
+    this._state.settings.academicApiEnabled = true;
+    await this._persist();
+    this.events.emit('auth-status', this._auth);
+    // Trigger sync after login
+    await this.syncNow();
+  }
+
+  async logout() {
+    this._auth = { ...disconnectedStatus() };
+    this.events.emit('auth-status', this._auth);
+    // Leave data intact, just disconnect
+  }
+
+  async syncNow() {
+    await this.init();
+    if (this._syncing) return this._state;
+    this._syncing = true;
+    this._state.sync.lastStartedAt = new Date().toISOString();
+    this._state.sync.runId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+    this._publishState();
+
+    const emitProgress = (stage, status, label, error) => {
+      this.events.emit('sync-progress', { stage, status, label, error });
+    };
+
+    try {
+      emitProgress('all', 'syncing', '正在更新校园数据…');
+      emitProgress('jwglxt', 'syncing', '正在登录教务系统…');
+      await sleep(150);
+
+      // Simulate jwglxt sync
+      emitProgress('jwglxt', 'done', '教务系统同步完成');
+      emitProgress('schedule', 'syncing', '正在同步课表…');
+      await sleep(100);
+
+      emitProgress('schedule', 'done', '课表同步完成');
+      emitProgress('grades', 'syncing', '正在同步成绩…');
+      await sleep(100);
+
+      // If we have mock data, it's already loaded; otherwise the sync
+      // would fetch from campus APIs. For stage 0, re-seed mock data.
+      if (!this._state || !this._state.profile) {
+        await this._seedMockData();
+      } else {
+        // Update sync timestamps
+        this._state.sync.lastCompletedAt = new Date().toISOString();
+        this._state.sync.lastRunAt = this._state.sync.lastCompletedAt;
+        this._state.sync.lastSuccessAt = this._state.sync.lastCompletedAt;
+        this._state.sync.lastError = null;
+        this._state.sync.sources = {
+          jwglxt: { label: '教务系统', lastSuccessAt: this._state.sync.lastCompletedAt },
+          theol: { label: '北化在线THEOL', lastSuccessAt: this._state.sync.lastCompletedAt },
+        };
+        this._state.sync.domains = {
+          profile: { lastSuccessAt: this._state.sync.lastCompletedAt },
+          terms: { lastSuccessAt: this._state.sync.lastCompletedAt },
+          schedule: { lastSuccessAt: this._state.sync.lastCompletedAt },
+          grades: { lastSuccessAt: this._state.sync.lastCompletedAt },
+          exams: { lastSuccessAt: this._state.sync.lastCompletedAt },
+          'selected-courses': { lastSuccessAt: this._state.sync.lastCompletedAt },
+          'academic-progress': { lastSuccessAt: this._state.sync.lastCompletedAt },
+          notices: { lastSuccessAt: this._state.sync.lastCompletedAt },
+        };
+      }
+
+      await this._persist();
+      emitProgress('all', 'done', '校园数据更新完成');
+      this._publishState();
+    } catch (error) {
+      this._state.sync.lastError = String(error);
+      this._state.sync.lastCompletedAt = new Date().toISOString();
+      await this._persist();
+      emitProgress('all', 'error', '校园数据更新失败', String(error));
+      this._publishState();
+    } finally {
+      this._syncing = false;
+    }
+    return structuredClone(this._state);
+  }
+
+  async retrySyncDomain(domain) {
+    // For stage 0, just re-trigger a full sync
+    return this.syncNow();
+  }
+
+  async refreshCourseResources() {
+    throw new Error('课程资源在移动端开发中');
+  }
+
+  async downloadCourseResource() {
+    throw new Error('课程资源下载在移动端开发中');
+  }
+
+  async queryFreeClassrooms() {
+    throw new Error('空闲教室查询在移动端开发中');
+  }
+
+  async getCourseSelection() {
+    return { ...this._courseSelection };
+  }
+
+  async discoverCourseSelection() {
+    throw new Error('选课发现在移动端开发中');
+  }
+
+  async getCourseSelectionCandidates() {
+    throw new Error('选课候选在移动端开发中');
+  }
+
+  async searchSchoolSchedule() {
+    throw new Error('全校课表查询在移动端开发中');
+  }
+
+  async getCachedSchoolSchedule() {
+    return null;
+  }
+
+  async getMotionVenueCatalog() {
+    throw new Error('MOTION 场馆在移动端开发中');
+  }
+
+  async refreshMotionVenueCatalog() {
+    throw new Error('MOTION 场馆在移动端开发中');
+  }
+
+  async queryMotionVenueStatus() {
+    throw new Error('MOTION 场馆状态在移动端开发中');
+  }
+
+  async saveCourseSelectionTarget() {
+    throw new Error('选课目标在移动端开发中');
+  }
+
+  async removeCourseSelectionTarget() {
+    throw new Error('选课目标在移动端开发中');
+  }
+
+  async setCourseSelectionSentinel() {
+    throw new Error('抢课哨兵在移动端开发中');
+  }
+
+  async startCourseSelection() {
+    throw new Error('抢课在移动端开发中');
+  }
+
+  async stopCourseSelection() {
+    throw new Error('抢课在移动端开发中');
+  }
+
+  async getAcademicCalendarAssets() {
+    throw new Error('校历资料在移动端开发中');
+  }
+
+  async refreshAcademicCalendarAssets() {
+    throw new Error('校历资料在移动端开发中');
+  }
+
+  async openSource(url) {
+    if (typeof url !== 'string' || !/^https?:\/\//iu.test(url)) {
+      throw new Error('仅可打开 HTTP(S) 来源链接');
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return true;
+  }
+
+  async openAcademicAttachment() {
+    return { cached: false };
+  }
+
+  async openAssignmentSource() {
+    throw new Error('作业来源在移动端开发中');
+  }
+
+  async openSchedulePdf() {
+    throw new Error('课表 PDF 导出在移动端开发中');
+  }
+
+  async getCourseWorkQueue() {
+    return { ...this._courseWorkQueue };
+  }
+
+  async setCourseWorkQueueEnabled() {
+    throw new Error('课程任务后台队列在移动端开发中');
+  }
+
+  async enqueueCourseWork() {
+    throw new Error('课程任务后台队列在移动端开发中');
+  }
+
+  async cancelCourseWorkJob() {
+    throw new Error('课程任务后台队列在移动端开发中');
+  }
+
+  async prepareCourseWork() {
+    throw new Error('课程工作包在移动端开发中');
+  }
+
+  async openCourseWork() {
+    throw new Error('课程工作包在移动端开发中');
+  }
+
+  async importCourseWorkFile() {
+    throw new Error('课程工作包在移动端开发中');
+  }
+
+  async openSubmission() {
+    throw new Error('作业提交在移动端开发中');
+  }
+
+  async applyTestAnswers() {
+    throw new Error('在线测试回填在移动端开发中');
+  }
+
+  async exportData(format, collection) {
+    await this.init();
+    const { toTheiaFeed } = await import('./feed.mjs');
+    if (format === 'json' || format === 'theia') {
+      const feed = toTheiaFeed(this._state);
+      const json = JSON.stringify(feed, null, 2);
+      // Stage 0: expose the feed through a downloadable blob on web;
+      // native builds will use the Capacitor Share/Filesystem plugin.
+      try {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'theia-feed.json';
+        anchor.click();
+        setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      } catch {
+        // No DOM available; still report success so callers can proceed.
+      }
+      return { canceled: false, filePath: 'theia-feed.json', files: 1 };
+    }
+    if (format === 'ics') {
+      const { toIcs } = await import('./feed.mjs');
+      const ics = toIcs(this._state);
+      try {
+        const blob = new Blob([ics], { type: 'text/calendar' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'theia-calendar.ics';
+        anchor.click();
+        setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      } catch { /* ignore */ }
+      return { canceled: false, filePath: 'theia-calendar.ics', files: 1 };
+    }
+    throw new Error('该导出格式在移动端开发中');
+  }
+
+  async openDataDirectory() {
+    throw new Error('本地数据目录仅在桌面客户端可用');
+  }
+
+  async getModelStatus() {
+    return { ...this._modelStatus };
+  }
+
+  async saveModelConfig(config) {
+    this._modelStatus = {
+      configured: true,
+      baseUrl: config.baseUrl || '',
+      model: config.model || '',
+      apiKeySaved: Boolean(config.apiKey),
+      encryptionAvailable: true,
+    };
+    if (this._state) {
+      this._state.settings.modelBaseUrl = config.baseUrl || '';
+      this._state.settings.modelProvider = config.provider || 'openai-compatible';
+      this._state.settings.modelName = config.model || '';
+      if (config.modelRouting) this._state.settings.modelRouting = { ...this._state.settings.modelRouting, ...config.modelRouting };
+      if (config.advisorConfig) this._state.settings.advisorConfig = { ...this._state.settings.advisorConfig, ...config.advisorConfig };
+      await this._persist();
+    }
+    return { ...this._modelStatus };
+  }
+
+  async clearModelApiKey() {
+    this._modelStatus.apiKeySaved = false;
+    return { ...this._modelStatus };
+  }
+
+  async cancelModelRequests() {
+    return { cancelled: 0 };
+  }
+
+  async validateModelConnection() {
+    throw new Error('模型连接验证在移动端开发中');
+  }
+
+  async discoverModels() {
+    throw new Error('模型发现在移动端开发中');
+  }
+
+  async processCourseWorkWithModel() {
+    throw new Error('模型处理在移动端开发中');
+  }
+
+  async renderAnswerPdf() {
+    throw new Error('PDF 渲染在移动端开发中');
+  }
+
+  async openAnswerPdf() {
+    throw new Error('PDF 打开在移动端开发中');
+  }
+
+  async summarizeNotices() {
+    throw new Error('通知摘要仅在桌面客户端可用');
+  }
+
+  async generateNotes() {
+    throw new Error('笔记生成在移动端开发中');
+  }
+
+  async generatePaper() {
+    throw new Error('论文生成在移动端开发中');
+  }
+
+  async renderMdFile() {
+    throw new Error('PDF 渲染在移动端开发中');
+  }
+
+  async getApiStatus() {
+    return {
+      baseUrl: '',
+      host: '127.0.0.1',
+      port: 0,
+      academicCalendarAssets: {},
+      academicPlanAssetBaseUrl: '',
+    };
+  }
+
+  async getFitnessScore() {
+    throw new Error('体测在移动端开发中');
+  }
+
+  async updateSettings(settings) {
+    await this.init();
+    if (this._state) {
+      Object.assign(this._state.settings, settings);
+      await this._persist();
+      this._publishState();
+    }
+    return structuredClone(this._state);
+  }
+
+  async installMcpClients() {
+    throw new Error('MCP 桌面专属');
+  }
+
+  async chooseAppBackground() {
+    return new Promise((resolve) => {
+      const picker = document.createElement('input');
+      picker.type = 'file';
+      picker.accept = 'image/png,image/jpeg,image/webp,image/gif,image/avif';
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+      picker.addEventListener('change', () => {
+        const file = picker.files?.[0];
+        if (!file) return finish({ canceled: true });
+        finish({
+          canceled: false,
+          url: URL.createObjectURL(file),
+          name: file.name,
+        });
+      });
+      picker.addEventListener('cancel', () => finish({ canceled: true }));
+      picker.click();
+    });
+  }
+
+  async getAppearancePresets() {
+    return { exists: false, updatedAt: null, presets: [] };
+  }
+
+  async saveAppearancePresets(presets) {
+    return { updatedAt: new Date().toISOString(), presets };
+  }
+
+  // ── Event Subscriptions ─────────────────────────────────────────────────
+  onSyncProgress(cb) {
+    return this.events.on('sync-progress', cb);
+  }
+
+  onSnapshot(cb) {
+    return this.events.on('snapshot', cb);
+  }
+
+  onAuthStatus(cb) {
+    return this.events.on('auth-status', cb);
+  }
+
+  onCourseSelection(cb) {
+    return this.events.on('course-selection', cb);
+  }
+
+  onCourseWorkQueue(cb) {
+    return this.events.on('course-work-queue', cb);
+  }
+
+  onNewMail(cb) {
+    return this.events.on('new-mail', cb);
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
