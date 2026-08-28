@@ -58,10 +58,11 @@ export class CampusSync {
   }
 
   // Runs the desktop jwglxt sync and merges into the given state.
-  async syncJwglxt(state, { domains = JWGLXT_SYNC_DOMAINS } = {}) {
+  // Additional adapter options (e.g. freeClassroom) pass through unchanged.
+  async syncJwglxt(state, { domains = JWGLXT_SYNC_DOMAINS, ...adapterOptions } = {}) {
     if (!this.adapter) await this.connect();
     const startedAt = new Date().toISOString();
-    const result = await this.adapter.sync({ domains, includeAcademicExtras: false });
+    const result = await this.adapter.sync({ domains, includeAcademicExtras: false, ...adapterOptions });
     const merged = mergeSyncResult(state, {
       ...result,
       runId: startedAt,

@@ -55,7 +55,10 @@
   - Cookie 拦截返回 JS 桥，会话注入 `SessionService`
   - 已编译进 APK（Capacitor 7 ActivityCallback 模式）
 - [x] **本地通知**：`notify.mjs`（@capacitor/local-notifications），同步完成/失败提醒
-- [ ] 抢课、邮箱、空闲教室、场馆（复用 core，逐步接入）
+- [x] **场馆（MOTION）**：`MotionVenueAdapter` 原样接入（discover/queryStatus），匿名 GET 无需登录
+- [x] **空闲教室**：`queryFreeClassrooms()` 走 jwglxt 适配器 `free-classroom` 域（带学期查询条件）
+- [x] **抢课**：`CourseSelectionService` 接入（discover/candidates），客户端复用教务会话
+- [ ] 邮箱（IMAP 需 node:net，浏览器不可直移；待原生 IMAP 插件或 webmail 通道）
 - [ ] 后台同步（WorkManager）
 
 ## 阶段4：打磨与发布

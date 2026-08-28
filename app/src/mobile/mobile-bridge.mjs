@@ -565,20 +565,66 @@ export class MobileBridge {
     throw new Error('课程资源下载在移动端开发中');
   }
 
-  async queryFreeClassrooms() {
-    throw new Error('空闲教室查询在移动端开发中');
+  async queryFreeClassrooms(query) {
+    await this.init();
+    if (!query?.termId) throw new Error('请选择有效的教务学期');
+    const term = (this._state?.terms || []).find((item) => item?.id === query.termId);
+    if (!term) throw new Error('请选择有效的教务学期');
+    if (!this._campusSync) {
+      const { CampusSync } = await import('./campus/campus-sync.mjs');
+      this._campusSync = new CampusSync({ vault: this.vault });
+    }
+    const { state } = await this._campusSync.syncJwglxt(this._state, {
+      domains: ['free-classroom'],
+      freeClassroom: { ...query, term },
+    });
+    this._state = state;
+    await this._persist();
+    this._publishState();
+    return structuredClone(this._state);
   }
 
   async getCourseSelection() {
     return { ...this._courseSelection };
   }
 
-  async discoverCourseSelection() {
-    throw new Error('选课发现在移动端开发中');
+  async _courseSelectionService() {
+    if (this._csService) return this._csService;
+    const { CourseSelectionService } = await import('../../core/course-selection.mjs');
+    if (!this._campusClient) {
+      const { AcademicApiClient } = await import('../../core/academic-api-client.mjs');
+      const creds = await this.vault.getSecret(VAULT_KEYS.academicApi);
+      if (creds?.username && creds?.password) {
+        this._campusClient = new AcademicApiClient({
+          username: creds.username,
+          password: creds.password,
+        });
+      }
+    }
+    if (!this._campusClient) throw new Error('选课需要先登录教务系统');
+    const service = new CourseSelectionService({
+      client: this._campusClient,
+      getState: () => this._state || {},
+      onChange: (snapshot) => {
+        this._courseSelection = snapshot;
+        this.events.emit('course-selection', snapshot);
+      },
+      onDiagnostic: (event, fields) => {},
+    });
+    this._csService = service;
+    return service;
   }
 
-  async getCourseSelectionCandidates() {
-    throw new Error('选课候选在移动端开发中');
+  async discoverCourseSelection() {
+    const service = await this._courseSelectionService();
+    const portal = await service.discover();
+    return portal;
+  }
+
+  async getCourseSelectionCandidates(blockId, target, options) {
+    const service = await this._courseSelectionService();
+    const result = await service.candidates(blockId, target, options);
+    return result;
   }
 
   async searchSchoolSchedule() {
@@ -589,16 +635,31 @@ export class MobileBridge {
     return null;
   }
 
+  async _motionAdapter() {
+    if (this._motion) return this._motion;
+    const { MotionVenueAdapter } = await import('../../core/adapters/motion.mjs');
+    this._motion = new MotionVenueAdapter({ fetchImpl: globalThis.fetch });
+    return this._motion;
+  }
+
   async getMotionVenueCatalog() {
-    throw new Error('MOTION 场馆在移动端开发中');
+    const adapter = await this._motionAdapter();
+    const catalog = await adapter.discover();
+    this._motionCatalog = catalog;
+    return catalog;
   }
 
   async refreshMotionVenueCatalog() {
-    throw new Error('MOTION 场馆在移动端开发中');
+    const adapter = await this._motionAdapter();
+    const catalog = await adapter.discover();
+    this._motionCatalog = catalog;
+    return catalog;
   }
 
-  async queryMotionVenueStatus() {
-    throw new Error('MOTION 场馆状态在移动端开发中');
+  async queryMotionVenueStatus(query) {
+    const adapter = await this._motionAdapter();
+    const result = await adapter.queryStatus(query || {});
+    return result;
   }
 
   async saveCourseSelectionTarget() {
