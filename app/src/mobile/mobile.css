@@ -1,136 +1,252 @@
-/* THEIA 移动版增强样式（阶段2）
-   - 窄屏布局：侧栏浮层、全宽内容、安全区
-   - 触控优化：大目标、下拉刷新区
-   - 隐藏桌面专属元素（窗口控件）
-*/
+/* ═══════════════════════════════════════════════════════════════════
+   THEIA 移动版 UI 层 v2（mobile.css）
+   不改桌面源文件；覆盖桌面样式为手机 App 质感。基于桌面已有响应式
+   (@media ≤920px: .sidebar.open 抽屉 / .mobile-menu 汉堡 / .sidebar-scrim)。
+   ═══════════════════════════════════════════════════════════════════ */
+
 :root {
   --theia-safe-top: env(safe-area-inset-top, 0px);
   --theia-safe-bottom: env(safe-area-inset-bottom, 0px);
   --theia-safe-left: env(safe-area-inset-left, 0px);
   --theia-safe-right: env(safe-area-inset-right, 0px);
-  --theia-mobile-header-height: 48px;
+  --theia-card-radius: 16px;
+  --theia-card-shadow: 0 1px 2px rgba(18,28,40,.05), 0 8px 24px -12px rgba(18,28,40,.16);
 }
 
 html, body {
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  /* Prevent pull-to-refresh from interfering with custom scroll */
-  overflow: hidden;
-  height: 100%;
 }
 
-/* 桌面标题栏/窗口控件隐藏 */
-.titlebar {
-  display: flex !important;
-  padding-top: max(var(--theia-safe-top), 0.25rem) !important;
-  min-height: var(--theia-mobile-header-height) !important;
-}
-.titlebar .window-controls { display: none !important; }
-.titlebar .app-title { font-size: 1rem !important; }
+@media (max-width: 720px) {
 
-/* 侧栏：移动端全屏浮层 */
-.app-shell .sidebar {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: min(320px, 86vw) !important;
-  height: 100dvh !important;
-  z-index: 100 !important;
-  transform: translateX(0);
-  transition: transform 0.25s ease;
-  box-shadow: 2px 0 16px rgba(0,0,0,0.3);
-}
-.app-shell.sidebar-is-collapsed .sidebar {
-  transform: translateX(-110%);
-  box-shadow: none;
-}
-.app-shell.sidebar-is-collapsed .app-body {
-  margin-left: 0 !important;
-}
+  /* ── 隐藏桌面标题栏，topbar 顶到屏幕顶部 ───────────────────── */
+  .titlebar { display: none !important; }
 
-/* 侧栏遮罩 */
-.app-shell.sidebar-is-collapsed::before {
-  content: none;
-}
-.app-shell:not(.sidebar-is-collapsed)::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.3);
-  z-index: 99;
-}
+  /* ── 侧栏抽屉（桌面已用 .open 类驱动，这里只做质感） ───────── */
+  .sidebar {
+    width: min(320px, 88vw) !important;
+    padding-top: calc(var(--theia-safe-top) + 24px) !important;
+    border-radius: 0 20px 20px 0;
+    box-shadow: 12px 0 48px -12px rgba(0,0,0,.5);
+  }
+  .sidebar-scrim { background: rgba(8,12,18,.45); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+  .sidebar .brand { padding-bottom: 20px; }
+  .brand-wordmark strong { font-size: 19px; }
+  .sidebar nav button {
+    min-height: 48px; padding: 0 14px; gap: 13px;
+    font-size: 14px; border-radius: 12px;
+  }
+  .sidebar nav button svg { width: 20px; height: 20px; }
+  .nav-group-label { padding: 10px 14px 6px; font-size: 10px; letter-spacing: .14em; }
+  .sidebar-status-dock { margin: 6px 6px 20px; padding: 12px; border-radius: 14px; }
+  .sync-summary { padding: 13px 12px; border-radius: 12px; }
+  .sidebar-bottom { padding: 4px 8px; }
+  .sidebar-bottom > button { min-height: 44px; font-size: 13px; }
+  .sidebar-close {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    color: #8a9ba8;
+  }
+  .sidebar-collapse { display: none !important; }
 
-/* 工作区全宽 */
-.app-body {
-  margin-left: 0 !important;
-  padding-bottom: calc(var(--theia-safe-bottom) + 60px) !important;
-  width: 100% !important;
-}
+  /* ── Topbar：手机顶部条 ────────────────────────────────────── */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    min-height: calc(var(--theia-safe-top) + 56px);
+    padding: calc(var(--theia-safe-top) + 8px) 14px 8px;
+    background: color-mix(in srgb, var(--card, #fff) 86%, transparent);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+  .topbar::after { display: none; }
+  .mobile-menu {
+    display: grid !important;
+    width: 42px; height: 42px;
+    border-radius: 13px;
+    color: var(--ink, #17231f);
+    background: var(--secondary, #edf1f1);
+    margin-right: 4px;
+  }
+  .mobile-menu:active { transform: scale(.96); }
+  .page-title { gap: 8px; }
+  .page-title h1 { font-size: 19px; }
+  .page-title p { display: none; }
+  .top-actions { gap: 8px; }
+  .icon-button { width: 42px; height: 42px; border-radius: 13px; }
+  .source-group, .source-status { display: none !important; }
+  .profile-chip { display: none !important; }
+  .search-box { width: 132px; height: 38px; }
 
-/* 触控目标 */
-button, a, [role="button"], .nav-item, .sidebar-item {
-  min-height: 44px !important;
-  min-width: 44px !important;
-}
+  /* 横幅 */
+  .login-banner, .preview-banner, .message-bar, .sync-live-banner {
+    margin: 0 14px;
+    border-radius: 0 0 14px 14px;
+    padding: 12px 14px;
+  }
 
-/* 列表区滚动 */
-.workspace, .scroll-area {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
+  /* ── 内容区 ────────────────────────────────────────────────── */
+  .content-area {
+    padding: 14px 14px calc(28px + var(--theia-safe-bottom) + 96px) !important;
+  }
+  .workspace, .content-area, .sidebar { -webkit-overflow-scrolling: touch; }
 
-/* Dashboard 卡片在窄屏 */
-@media (max-width: 640px) {
-  .dashboard-stats, .dashboard-grid {
+  /* ── Dashboard 卡片化 ──────────────────────────────────────── */
+  .dashboard-grid { gap: 14px; }
+  .metric-strip {
+    display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 0.5rem !important;
+    gap: 10px;
+    background: transparent; border: 0; box-shadow: none;
   }
-  .dashboard-card, .stat-card {
-    padding: 0.75rem !important;
+  .metric-strip button {
+    min-height: 96px;
+    padding: 14px 16px;
+    background: var(--card, #fff) !important;
+    border: 1px solid var(--line, #e2e7ec) !important;
+    border-right: 1px solid var(--line, #e2e7ec) !important;
+    border-radius: var(--theia-card-radius);
+    box-shadow: var(--theia-card-shadow);
   }
+  .metric-strip strong { font-size: 28px; }
+  .metric-strip span { font-size: 11px; }
+
+  .quick-actions { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .quick-actions button {
+    min-height: 76px;
+    padding: 12px 14px;
+    border-radius: var(--theia-card-radius);
+    box-shadow: var(--theia-card-shadow);
+  }
+  .quick-actions strong { font-size: 13px; }
+  .quick-actions small { font-size: 11px; }
+  .quick-action-icon { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 11px; }
+
+  /* 面板 */
+  .panel {
+    padding: 16px;
+    background: var(--card, #fff);
+    border: 1px solid var(--line, #e2e7ec);
+    border-radius: var(--theia-card-radius);
+    box-shadow: var(--theia-card-shadow);
+  }
+  .panel-heading { margin-bottom: 10px; padding-bottom: 10px; }
+  .panel-heading h2, .section-heading h2 { font-size: 16px; }
+  .eyebrow { font-size: 10px; }
+
+  /* 列表 */
+  .timeline-row, .task-row { min-height: 76px; padding: 12px 4px; }
+  .timeline-row strong, .task-row strong { font-size: 14px; }
+  .timeline-row span, .task-row span { font-size: 12px; }
+  .period-pill { min-height: 30px; padding: 0 10px; font-size: 11px; border-radius: 8px; }
+  .task-state { width: 32px; height: 32px; border-radius: 10px; }
+  .task-command { min-height: 34px; padding: 0 10px; font-size: 12px; border-radius: 9px; }
+  .notice-compact button { padding: 13px 4px; }
+  .notice-compact strong { font-size: 13px; }
+
+  .exam-focus { min-height: 150px; }
+  .date-block { width: 68px; height: 78px; border-radius: 13px; }
+  .date-block strong { font-size: 25px; }
+  .exam-focus h3 { font-size: 17px; }
+  .seat-badge, .score-badge { border-radius: 6px; font-size: 12px; }
+
+  /* ── 数据页 / 成绩 / 考试 ──────────────────────────────────── */
+  .data-page { gap: 16px; }
+  .exam-row { min-height: 90px; padding: 16px 4px; }
+  .grade-summary > div { padding: 15px 16px; }
+  .grade-summary strong { font-size: 24px; }
+
+  /* ── 课表 ──────────────────────────────────────────────────── */
+  .schedule-toolbar { margin-bottom: 14px; padding-bottom: 12px; }
+  .segmented button { min-height: 36px; font-size: 12px; padding: 0 13px; }
+  .term-selector-group select, .selection-controls select, .selection-form input,
+  .credential-form input, .model-service-form select, .numeric-setting input {
+    min-height: 42px; font-size: 13px; border-radius: 10px;
+  }
+  .day-column { min-height: 440px; }
+  .course-slot { min-height: 118px; padding: 11px; border-radius: 10px; }
+  .course-slot h3 { font-size: 13px; }
+
+  /* ── 设置 / 弹窗 ───────────────────────────────────────────── */
+  .settings-layout { flex-direction: column !important; }
+  .settings-sidebar { width: 100% !important; flex-shrink: 0 !important; }
+  .credential-modal, .modal-card, [class*="modal"] {
+    width: calc(100vw - 32px) !important;
+    max-width: 420px;
+    border-radius: 20px;
+  }
+  .modal-backdrop { padding: 16px !important; }
+  .modal-later { min-height: 44px; }
+
+  /* ── 地图 ──────────────────────────────────────────────────── */
+  .map-layer-controls, .map-zoom-controls { border-radius: 12px; }
 }
 
-/* 设置页窄屏适配 */
-@media (max-width: 640px) {
-  .settings-layout {
-    flex-direction: column !important;
+/* ── 触控目标与通用（≤920 也生效，抽屉场景） ─────────────────── */
+@media (max-width: 920px) {
+  button, a, [role="button"], .sidebar nav button, .icon-button,
+  .task-command, .quick-actions button, .notice-compact button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
-  .settings-sidebar {
-    width: 100% !important;
-    flex-shrink: 0 !important;
-  }
+  .topbar .icon-button { min-height: 42px; min-width: 42px; }
 }
 
-/* 底部安全区 */
-.app-shell {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+/* ── 移动端 FAB / 操作条（所有视口） ─────────────────────────── */
+.theia-mobile-actions {
+  position: fixed;
+  right: calc(var(--theia-safe-right) + 14px);
+  bottom: calc(var(--theia-safe-bottom) + 14px);
+  z-index: 200;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
 }
+.theia-mobile-fab {
+  width: 56px; height: 56px;
+  border-radius: 19px;
+  background: linear-gradient(135deg, #176c64, #1d8278);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  border: none;
+  box-shadow: 0 10px 28px -6px rgba(23,108,100,.55), 0 2px 6px rgba(18,28,40,.2);
+  cursor: pointer;
+}
+.theia-mobile-fab:active { transform: scale(.95); }
+.theia-mobile-action-sheet {
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--card, #1a2233);
+  border: 1px solid var(--border, #333);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 12px 40px -8px rgba(0,0,0,.5);
+}
+.theia-mobile-action-sheet button {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: 12px;
+  background: transparent; color: var(--foreground, #eee);
+  border: none; cursor: pointer;
+  font-size: 14px; font-weight: 500;
+  min-height: 44px; width: 100%;
+}
+.theia-mobile-action-sheet button:hover { background: var(--muted, #26314a); }
+.theia-mobile-action-sheet button:disabled { opacity: .5; }
+.spin { animation: theia-spin .8s linear infinite; }
 
-/* 下拉刷新触发器 */
+/* 下拉刷新指示器 */
 .theia-pull-to-refresh {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 0;
-  overflow: hidden;
-  transition: height 0.2s ease;
-  color: var(--color-muted-foreground);
-  font-size: 0.85rem;
-  gap: 0.5rem;
+  display: flex; align-items: center; justify-content: center;
+  height: 0; overflow: hidden;
+  transition: height .2s ease;
+  color: var(--muted-foreground, #687780);
+  font-size: 13px; gap: 8px;
+  background: var(--canvas, #f4f6f8);
 }
-.theia-pull-to-refresh.active {
-  height: 48px;
-}
+.theia-pull-to-refresh.active { height: 52px; }
 .theia-pull-to-refresh .spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--color-border);
-  border-top: 2px solid var(--color-primary);
+  width: 20px; height: 20px;
+  border: 2.5px solid var(--border, #dce4e4);
+  border-top: 2.5px solid var(--primary, #176c64);
   border-radius: 50%;
-  animation: theia-spin 0.6s linear infinite;
+  animation: theia-spin .6s linear infinite;
 }
-@keyframes theia-spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes theia-spin { to { transform: rotate(360deg); } }

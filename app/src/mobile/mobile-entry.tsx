@@ -7,11 +7,13 @@ declare global {
   interface Window { __THEIA_BOOTED__?: boolean; }
 }
 window.__THEIA_BOOTED__ = true;
-import './mobile.css';
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import MobileActions from './MobileActions';
 import '../main';
+// mobile.css must load AFTER '../main' (which pulls desktop styles.css) so our
+// mobile overrides win the cascade.
+import './mobile.css';
 import { installPullToRefresh } from './mobile-gestures.mjs';
 import { bridge } from '../bridge';
 
