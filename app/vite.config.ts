@@ -37,6 +37,9 @@ export default defineConfig({
       'node:module': path.resolve(__dirname, './src/mobile/polyfills/node-module.mjs'),
       'node:path': path.resolve(__dirname, './src/mobile/polyfills/node-path.mjs'),
       'node:perf_hooks': path.resolve(__dirname, './src/mobile/polyfills/node-perf.mjs'),
+      'node:fs/promises': path.resolve(__dirname, './src/mobile/polyfills/node-fs.mjs'),
+      'node:fs': path.resolve(__dirname, './src/mobile/polyfills/node-fs.mjs'),
+      'pdf-parse': path.resolve(__dirname, './node_modules/pdf-parse/dist/pdf-parse/web/pdf-parse.es.js'),
       // node-polyfills shims must resolve even from core/ (outside app root)
       'vite-plugin-node-polyfills/shims/buffer': path.resolve(__dirname, './node_modules/vite-plugin-node-polyfills/shims/buffer/dist/index.js'),
       'vite-plugin-node-polyfills/shims/global': path.resolve(__dirname, './node_modules/vite-plugin-node-polyfills/shims/global/dist/index.js'),

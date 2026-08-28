@@ -425,25 +425,52 @@ export class MobileBridge {
     };
 
     try {
+      // Real campus sync path: when academic API credentials are stored in the
+      // vault, run the desktop JwglxtAdapter inside the WebView (stage 1).
+      const hasRealCredentials = await this.vault.hasSecret(VAULT_KEYS.academicApi);
+      if (hasRealCredentials && this._state?.settings?.academicApiEnabled !== false) {
+        emitProgress('all', 'syncing', '正在更新校园数据…');
+        const { CampusSync } = await import('./campus/campus-sync.mjs');
+        const campusSync = new CampusSync({
+          vault: this.vault,
+          onProgress: (progress) => {
+            if (progress?.stage && progress?.status) {
+              emitProgress(progress.stage, progress.status, progress.label || undefined, progress.error || undefined);
+            }
+          },
+          onDiagnostic: (event, fields) => {
+            console.debug('[theia-mobile] campus diagnostic:', event, fields);
+          },
+        });
+        const { state } = await campusSync.syncJwglxt(this._state, {
+          domains: ['profile', 'terms', 'schedule', 'grades', 'exams', 'selected-courses', 'academic-progress', 'notices'],
+        });
+        this._state = state;
+        this._auth = {
+          jwglxt: { connected: true, unchecked: false },
+          theol: { connected: this._state?.settings?.academicAuthMode !== 'api', unchecked: false },
+        };
+        await this._persist();
+        this.events.emit('auth-status', this._auth);
+        emitProgress('all', 'done', '校园数据更新完成');
+        this._publishState();
+        return structuredClone(this._state);
+      }
+
+      // Mock/demo sync path (no real credentials yet)
       emitProgress('all', 'syncing', '正在更新校园数据…');
       emitProgress('jwglxt', 'syncing', '正在登录教务系统…');
       await sleep(150);
-
-      // Simulate jwglxt sync
       emitProgress('jwglxt', 'done', '教务系统同步完成');
       emitProgress('schedule', 'syncing', '正在同步课表…');
       await sleep(100);
-
       emitProgress('schedule', 'done', '课表同步完成');
       emitProgress('grades', 'syncing', '正在同步成绩…');
       await sleep(100);
 
-      // If we have mock data, it's already loaded; otherwise the sync
-      // would fetch from campus APIs. For stage 0, re-seed mock data.
       if (!this._state || !this._state.profile) {
         await this._seedMockData();
       } else {
-        // Update sync timestamps
         this._state.sync.lastCompletedAt = new Date().toISOString();
         this._state.sync.lastRunAt = this._state.sync.lastCompletedAt;
         this._state.sync.lastSuccessAt = this._state.sync.lastCompletedAt;

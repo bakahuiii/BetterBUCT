@@ -29,9 +29,14 @@
 - [x] **真实 API 优先登录**：`login()` 配置了教务 API 凭据时走真实 jwglxt 登录（取登录页 → CSRF → 公钥 → RSA 加密提交），否则回退 mock
 - [x] 凭据状态从 vault 恢复（启动时），`readSavedSecret` 走 vault
 
+### 已完成（续）
+- [x] **真实数据同步**：`campus-sync.mjs` 把桌面 `JwglxtAdapter` 原样跑在 WebView 里（profile/terms/schedule/grades/exams/selected-courses/academic-progress/notices），结果经 `mergeSyncResult`（schema.mjs 浏览器化）合入 store
+- [x] **schema.mjs 浏览器化**：createRequire polyfill（读 app 版本号）+ 根 `package.json`（Node 测试用）
+- [x] **真实校园管线验证**（live 测试 3/3）：登录页抓取、公钥端点（1024 位 RSA）、RSA 加密回环 —— 全部通过真实 jwglxt.buct.edu.cn
+
 ### 待完成
 - [ ] 受限 WebView CAS 登录（原生插件，白名单 buct.edu.cn）
-- [ ] 登录后的真实数据同步（课表/成绩/考试/通知，复用 `core/sync-service.mjs`）
+- [ ] THEOL 同步（作业/通知，复用 theol-mobile 解析器）
 - [ ] `core/store.mjs` 完整能力（锁/恢复/并发）移植
 
 ## 阶段2：P0 功能 UI 适配
