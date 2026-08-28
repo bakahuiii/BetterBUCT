@@ -641,40 +641,60 @@ export class MobileBridge {
 
   async exportData(format, collection) {
     await this.init();
-    const { toTheiaFeed } = await import('./feed.mjs');
+    const { toTheiaFeed, toIcs } = await import('./feed.mjs');
+    let filename = '';
+    let content = '';
+    let mime = 'application/json';
     if (format === 'json' || format === 'theia') {
-      const feed = toTheiaFeed(this._state);
-      const json = JSON.stringify(feed, null, 2);
-      // Stage 0: expose the feed through a downloadable blob on web;
-      // native builds will use the Capacitor Share/Filesystem plugin.
+      filename = 'theia-feed.json';
+      content = JSON.stringify(toTheiaFeed(this._state), null, 2);
+      mime = 'application/json';
+    } else if (format === 'ics') {
+      filename = 'theia-calendar.ics';
+      content = toIcs(this._state);
+      mime = 'text/calendar';
+    } else if (format === 'csv' && collection) {
+      const items = Array.isArray(this._state?.[collection]) ? this._state[collection] : [];
+      const keys = [...new Set(items.flatMap((item) => Object.keys(item || {})))]
+        .filter((key) => !['raw', 'rawHtml', 'sourceUrl'].includes(key));
+      const escape = (value) => {
+        const text = value === null || value === undefined ? '' : String(value);
+        return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+      };
+      content = [keys.join(','), ...items.map((item) => keys.map((key) => escape(item?.[key])).join(','))].join('\r\n') + '\r\n';
+      filename = 'theia-' + collection + '.csv';
+      mime = 'text/csv';
+    } else {
+      throw new Error('该导出格式在移动端开发中');
+    }
+
+    const native = Boolean(window.Capacitor?.isNativePlatform?.());
+    if (native) {
       try {
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = 'theia-feed.json';
-        anchor.click();
-        setTimeout(() => URL.revokeObjectURL(url), 30_000);
+        const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+        const { Share } = await import('@capacitor/share');
+        const path = 'exports/' + filename;
+        await Filesystem.mkdir({ path: 'exports', directory: Directory.Data, recursive: true });
+        await Filesystem.writeFile({ path, directory: Directory.Data, data: content, encoding: Encoding.UTF8 });
+        const uri = await Filesystem.getUri({ path, directory: Directory.Data });
+        await Share.share({ title: 'THEIA 数据导出', url: uri.uri, dialogTitle: '分享数据包' });
+        return { canceled: false, filePath: path, files: 1 };
       } catch {
-        // No DOM available; still report success so callers can proceed.
+        // Fall through to web-style download if share fails
       }
-      return { canceled: false, filePath: 'theia-feed.json', files: 1 };
     }
-    if (format === 'ics') {
-      const { toIcs } = await import('./feed.mjs');
-      const ics = toIcs(this._state);
-      try {
-        const blob = new Blob([ics], { type: 'text/calendar' });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = 'theia-calendar.ics';
-        anchor.click();
-        setTimeout(() => URL.revokeObjectURL(url), 30_000);
-      } catch { /* ignore */ }
-      return { canceled: false, filePath: 'theia-calendar.ics', files: 1 };
+    try {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch {
+      // No DOM available; still report success so callers can proceed.
     }
-    throw new Error('该导出格式在移动端开发中');
+    return { canceled: false, filePath: filename, files: 1 };
   }
 
   async openDataDirectory() {

@@ -13,37 +13,38 @@
 - [x] store 存储后端：web（localStorage）与 Capacitor Filesystem（原生）双后端
 - [x] mock 数据复用桌面 `demo.ts`（序列化为 `mock-data.json`），UI 可完整浏览课表/成绩/考试/学业/通知
 - [x] Web 构建通过（`vite build`），无头浏览器验证 UI 完整渲染
-- [x] store 单元测试通过（7/7）
-- [x] Android 平台工程（`cap add android`，4 个 Capacitor 插件）
+- [x] store 单元测试通过（12/12）
+- [x] Android 平台工程（`cap add android`，5 个 Capacitor 插件）
 - [x] Android SDK + JDK21 + 本地 Gradle 8.11.1 环境就绪
-- [x] 产出"壳 + mock 数据"debug APK：`release/THEIA-mobile-stage0-debug.apk`（105MB）
+- [x] 产出"壳 + mock 数据"debug APK：`release/THEIA-mobile-stage0-debug.apk`
 
-## 阶段1：数据层 + 登录（进行中，已完成核心）
+## 阶段1：数据层 + 登录（✅ 核心完成）
 
-### 已完成
-- [x] **浏览器兼容层**：`node:crypto`（node-forge RSA-PKCS1 v1.5 + jsrsasign 哈希）、`node:buffer`、`node:path/module/perf_hooks` polyfill + Vite 别名
-- [x] **桌面核心复用**：`core/academic-api-client.mjs` 原样打入 WebView（RSA 加密回环测试通过，可被 Node 私钥解密）
-- [x] **cheerio 浏览器版**：指向 `dist/browser` 入口，避免 Node stream 依赖
-- [x] **TheiaVault**：凭据安全存储抽象（web 混淆 + 原生 Preferences），统一/教务 API/邮箱/模型 Key 四类凭据
-- [x] **TheiaSession**：Cookie jar 会话服务 + 受限 WebView 登录占位
-- [x] **真实 API 优先登录**：`login()` 配置了教务 API 凭据时走真实 jwglxt 登录（取登录页 → CSRF → 公钥 → RSA 加密提交），否则回退 mock
-- [x] 凭据状态从 vault 恢复（启动时），`readSavedSecret` 走 vault
+- [x] 浏览器兼容层：`node:crypto`（node-forge RSA-PKCS1 v1.5 + jsrsasign 哈希）、`node:buffer`、`node:path/module/perf_hooks/fs` polyfill + Vite 别名
+- [x] 桌面核心复用：`core/academic-api-client.mjs`、`core/adapters/jwglxt.mjs`、`core/schema.mjs`、全部解析器原样打入 WebView
+- [x] **真实数据同步**：`campus-sync.mjs` 跑桌面 `JwglxtAdapter`（profile/terms/schedule/grades/exams/selected-courses/academic-progress/notices），`mergeSyncResult` 合入 store
+- [x] **TheiaVault**：凭据安全存储（web 混淆 + 原生 Preferences），启动时恢复
+- [x] **TheiaSession**：Cookie jar 会话服务
+- [x] **真实 API 优先登录**：`login()` 配置凭据后走真实 jwglxt 登录
+- [x] **真实校园管线验证**（live 测试 3/3）：登录页 / 公钥（1024 位 RSA）/ RSA 加密回环
 
-### 已完成（续）
-- [x] **真实数据同步**：`campus-sync.mjs` 把桌面 `JwglxtAdapter` 原样跑在 WebView 里（profile/terms/schedule/grades/exams/selected-courses/academic-progress/notices），结果经 `mergeSyncResult`（schema.mjs 浏览器化）合入 store
-- [x] **schema.mjs 浏览器化**：createRequire polyfill（读 app 版本号）+ 根 `package.json`（Node 测试用）
-- [x] **真实校园管线验证**（live 测试 3/3）：登录页抓取、公钥端点（1024 位 RSA）、RSA 加密回环 —— 全部通过真实 jwglxt.buct.edu.cn
-
-### 待完成
+### 待完成（阶段1）
 - [ ] 受限 WebView CAS 登录（原生插件，白名单 buct.edu.cn）
 - [ ] THEOL 同步（作业/通知，复用 theol-mobile 解析器）
 - [ ] `core/store.mjs` 完整能力（锁/恢复/并发）移植
 
-## 阶段2：P0 功能 UI 适配
+## 阶段2：P0 功能 UI 适配（✅ 主体完成）
 
-- [ ] `src/` 视图移动端适配（触控/窄屏/下拉刷新）
-- [ ] 课表/成绩/考试/学业/通知页上线
-- [ ] 导出/导入数据包（导入已具备 `importDataPackage`）
+- [x] 移动布局适配：mobile.css（侧栏浮层、全宽内容、安全区、触控目标、桌面窗口控件隐藏）
+- [x] 下拉刷新手势（`mobile-gestures.mjs`，触顶下拉触发 syncNow）
+- [x] 移动端 FAB（`MobileActions.tsx`）：数据包导入 + 立即同步（不改桌面源文件，独立挂载）
+- [x] 导出升级：原生端经 Filesystem 写入 + Share 分享（web 回退 Blob 下载）
+- [x] 课表/成绩/考试/学业/通知页随桌面视图可用
+- [x] 无头浏览器验证 FAB/下拉刷新区渲染
+
+### 待完成（阶段2）
+- [ ] 真机触控/窄屏实测调优
+- [ ] 移动端专属首页/导航（如需）
 
 ## 阶段3：P1 功能
 
