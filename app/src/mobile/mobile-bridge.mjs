@@ -118,6 +118,22 @@ export class MobileBridge {
     this._initialized = true;
     this.events.emit('snapshot', this._state);
     this.events.emit('auth-status', this._auth);
+    // Install auto-sync triggers (app resume + network reconnect) and the
+    // WorkManager periodic reminder once the bridge is fully initialized.
+    try {
+      const { installAutoSyncTriggers, scheduleBackgroundSync } = await import('./background.mjs');
+      installAutoSyncTriggers({
+        syncNow: () => this.syncNow(),
+        getState: () => this._state,
+        onMessage: () => this.events.emit('snapshot', this._state),
+      });
+      if (this._state?.settings?.autoSync) {
+        const interval = this._state.settings.syncIntervalMinutes || 30;
+        scheduleBackgroundSync(Math.max(15, interval)).catch(() => undefined);
+      }
+    } catch {
+      // Auto-sync is best-effort; the app remains fully usable without it.
+    }
   }
 
   async _seedMockData() {
@@ -496,6 +512,7 @@ export class MobileBridge {
           ok: true,
           scheduleCount: this._state?.schedule?.length || 0,
         });
+        import('./background.mjs').then(({ recordSyncNow }) => void recordSyncNow()).catch(() => undefined);
         return structuredClone(this._state);
       }
 
@@ -538,6 +555,7 @@ export class MobileBridge {
       this._publishState();
       const { notifySyncResult } = await import('./notify.mjs');
       void notifySyncResult({ ok: true, scheduleCount: this._state?.schedule?.length || 0 });
+      import('./background.mjs').then(({ recordSyncNow }) => void recordSyncNow()).catch(() => undefined);
     } catch (error) {
       this._state.sync.lastError = String(error);
       this._state.sync.lastCompletedAt = new Date().toISOString();

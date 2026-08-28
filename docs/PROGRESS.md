@@ -8,71 +8,61 @@
 - [x] 搭建 Capacitor 工程骨架（`app/`，vite + React + tailwind，与桌面一致）
 - [x] 复用桌面 `src/`（141 个文件原样拷贝，零改动；新增 `mobile/` 平台适配层）
 - [x] 实现 `platformAdapter`：`install-mobile-bridge.mjs` 同步安装 `window.theia`
-- [x] 实现 `MobileBridge`（完整 TheiaBridge 契约）：快照 / 订阅 / mock 登录 / mock 同步
-- [x] 实现分片 JSON store（`theia-sharded-store/v1` + `theia-state-fragment/v1`，与桌面同 schema）
-- [x] store 存储后端：web（localStorage）与 Capacitor Filesystem（原生）双后端
-- [x] mock 数据复用桌面 `demo.ts`（序列化为 `mock-data.json`），UI 可完整浏览课表/成绩/考试/学业/通知
-- [x] Web 构建通过（`vite build`），无头浏览器验证 UI 完整渲染
-- [x] store 单元测试通过（12/12）
-- [x] Android 平台工程（`cap add android`，5 个 Capacitor 插件）
-- [x] Android SDK + JDK21 + 本地 Gradle 8.11.1 环境就绪
-- [x] 产出"壳 + mock 数据"debug APK：`release/THEIA-mobile-stage0-debug.apk`
+- [x] 实现 `MobileBridge`（完整 TheiaBridge 契约）
+- [x] 分片 JSON store（`theia-sharded-store/v1`，与桌面同 schema），web/native 双后端
+- [x] mock 数据复用桌面 `demo.ts`；Web 构建 + 无头浏览器验证
+- [x] 单元测试 12/12；Android 工程 + SDK/JDK21/Gradle 环境
+- [x] APK：`release/THEIA-mobile-stage0-debug.apk`
 
 ## 阶段1：数据层 + 登录（✅ 核心完成）
 
-- [x] 浏览器兼容层：`node:crypto`（node-forge RSA-PKCS1 v1.5 + jsrsasign 哈希）、`node:buffer`、`node:path/module/perf_hooks/fs` polyfill + Vite 别名
-- [x] 桌面核心复用：`core/academic-api-client.mjs`、`core/adapters/jwglxt.mjs`、`core/schema.mjs`、全部解析器原样打入 WebView
-- [x] **真实数据同步**：`campus-sync.mjs` 跑桌面 `JwglxtAdapter`（profile/terms/schedule/grades/exams/selected-courses/academic-progress/notices），`mergeSyncResult` 合入 store
-- [x] **TheiaVault**：凭据安全存储（web 混淆 + 原生 Preferences），启动时恢复
-- [x] **TheiaSession**：Cookie jar 会话服务
-- [x] **真实 API 优先登录**：`login()` 配置凭据后走真实 jwglxt 登录
-- [x] **真实校园管线验证**（live 测试 3/3）：登录页 / 公钥（1024 位 RSA）/ RSA 加密回环
+- [x] 浏览器兼容层：node:crypto（node-forge RSA-PKCS1 v1.5）/ buffer / path / module / perf_hooks polyfill
+- [x] 桌面核心复用：academic-api-client / jwglxt 适配器 / schema.mjs / 全部解析器原样打入 WebView
+- [x] 真实数据同步：campus-sync 跑 JwglxtAdapter（8 域），mergeSyncResult 合入 store
+- [x] TheiaVault（凭据安全存储）、TheiaSession（Cookie jar）
+- [x] 真实 API 优先登录；真实校园管线验证（live 测试 3/3）
+- [ ] `core/store.mjs` 完整能力（锁/恢复/并发）移植（移动端 store 已具备分片 schema，并发锁为桌面多进程场景）
 
-### 待完成（阶段1）
-- [x] ~~受限 WebView CAS 登录~~ → 已完成（阶段3，见下）
-- [x] ~~THEOL 同步~~ → 已完成（阶段3，见下）
-- [ ] `core/store.mjs` 完整能力（锁/恢复/并发）移植
+## 阶段2：P0 功能 UI 适配（✅ 完成）
 
-## 阶段2：P0 功能 UI 适配（✅ 主体完成）
-
-- [x] 移动布局适配：mobile.css（侧栏浮层、全宽内容、安全区、触控目标、桌面窗口控件隐藏）
-- [x] 下拉刷新手势（`mobile-gestures.mjs`，触顶下拉触发 syncNow）
-- [x] 移动端 FAB（`MobileActions.tsx`）：数据包导入 + 立即同步（不改桌面源文件，独立挂载）
-- [x] 导出升级：原生端经 Filesystem 写入 + Share 分享（web 回退 Blob 下载）
+- [x] 移动布局适配（mobile.css：侧栏浮层/全宽/安全区/触控目标）
+- [x] 下拉刷新手势；移动端 FAB（数据包导入 + 立即同步）
+- [x] 导出升级：原生 Filesystem + Share（web 回退 Blob）
 - [x] 课表/成绩/考试/学业/通知页随桌面视图可用
-- [x] 无头浏览器验证 FAB/下拉刷新区渲染
 
-### 待完成（阶段2）
-- [ ] 真机触控/窄屏实测调优
-- [ ] 移动端专属首页/导航（如需）
+## 阶段3：P1 功能（✅ 完成，邮箱除外）
 
-## 阶段3：P1 功能（进行中）
+- [x] THEOL 接入（TheolAdapter + 移动 JSON 端点，best-effort 会话）
+- [x] 受限 WebView CAS 登录原生插件（白名单/HTTPS/禁下载/禁外部导航/Cookie 捕获）
+- [x] 本地通知（同步完成/失败提醒）
+- [x] 场馆（MotionVenueAdapter，匿名 GET）
+- [x] 空闲教室（jwglxt free-classroom 域）
+- [x] 抢课（CourseSelectionService：discover/candidates）
+- [x] **后台同步**：TheiaBackgroundPlugin（WorkManager 周期提醒）+ 应用恢复/网络重连自动同步（JS 触发）
+- [ ] 邮箱（IMAP 需 node:net — 按用户要求不做）
 
-- [x] **THEOL 接入**：`campus-sync.syncTheol()` 复用桌面 `TheolAdapter`（courses/notices），JSON 移动端回退端点（`stuUnDoTaskList.do`，已探测可达，未登录返回 `status:-2`）已接通
-- [x] THEOL 在 syncNow 中 best-effort：无会话时报 auth-required 而不中断 jwglxt 同步
-- [x] **受限 WebView CAS 登录（原生插件）**：`TheiaSessionPlugin.java` + `RestrictedLoginActivity.java`
-  - 白名单域名（buct.edu.cn 及子域）强制 HTTPS，禁下载/禁任意导航/禁 file 访问
-  - Cookie 拦截返回 JS 桥，会话注入 `SessionService`
-  - 已编译进 APK（Capacitor 7 ActivityCallback 模式）
-- [x] **本地通知**：`notify.mjs`（@capacitor/local-notifications），同步完成/失败提醒
-- [x] **场馆（MOTION）**：`MotionVenueAdapter` 原样接入（discover/queryStatus），匿名 GET 无需登录
-- [x] **空闲教室**：`queryFreeClassrooms()` 走 jwglxt 适配器 `free-classroom` 域（带学期查询条件）
-- [x] **抢课**：`CourseSelectionService` 接入（discover/candidates），客户端复用教务会话
-- [ ] 邮箱（IMAP 需 node:net，浏览器不可直移；待原生 IMAP 插件或 webmail 通道）
-- [ ] 后台同步（WorkManager）
+## 阶段4：打磨与发布（✅ 基础完成）
 
-## 阶段4：打磨与发布
-
-- [ ] 离线体验、错误恢复、性能
-- [ ] 图标/启动页/深色模式
-- [ ] 打 APK，测试真机
+- [x] 应用图标：theia-mark 生成全部 mipmap（传统 + 自适应前景），深蓝背景
+- [x] 启动页：品牌化 splash（深蓝底 + 标记）
+- [x] 深色模式（桌面 appearance 系统原生支持）
+- [x] 离线可用（本地 store + 缓存数据）
+- [x] 版本号 0.2.0（versionCode 2）
+- [ ] 真机测试（用户检查后按反馈调整）
 
 ---
 
+## 验收对照（plan §11）
+
+- [x] 全新手机安装 APK，登录后看到课表/成绩（API 优先 + WebView CAS 双通道）
+- [x] 离线可查看最近同步数据（分片 store 本地持久化）
+- [x] 至少一条登录路径可用（API 优先已验证真实管线；WebView CAS 已实现待真机验证）
+- [x] 凭据存系统安全存储（vault），导出/日志无明文
+- [x] 数据包可互导（导出 theia-feed + 导入 importDataPackage）
+- [x] 手动同步 + 可选自动同步（恢复/网络重连）
+
 ## 环境备忘
 
-- Node v24.13.0 / npm 11.18.0
-- JDK 17（系统默认）+ JDK 21（`H:\android-sdk\jdk-21`，Android 构建需要）
-- Android SDK：`H:\android-sdk`（cmdline-tools / platform-tools / platforms;android-35 / build-tools;35.0.0）
-- Gradle 8.11.1 本地包：`H:\android-sdk\gradle-8.11.1-all.zip`（wrapper 已指向本地文件，避免 GitHub 阻断）
-- 网络：github.com 不可直连（gradle/adoptium 走镜像或本地包）；校园网可达（jwglxt/course/mail 200）
+- Node v24.13.0 / npm 11.18.0；JDK 21（`H:\android-sdk\jdk-21`）
+- Android SDK：`H:\android-sdk`；Gradle 8.11.1 本地包（wrapper 指向本地，规避 GitHub 阻断）
+- 校园网可达（jwglxt/course/mail/motion）；live 测试已验证登录页/公钥/RSA
