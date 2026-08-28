@@ -643,6 +643,48 @@ export class MobileBridge {
     throw new Error('PDF 渲染在移动端开发中');
   }
 
+  // ── Mobile-only extensions (not part of the desktop TheiaBridge) ─────
+  // Import a theia-feed data package (exported by desktop or mobile) into the
+  // local sharded store. Enables device-to-device migration without a server.
+  async importDataPackage(payload) {
+    await this.init();
+    const data = typeof payload === 'string'
+      ? JSON.parse(payload)
+      : payload;
+    if (!data || typeof data !== 'object') {
+      throw new Error('数据包格式不受支持');
+    }
+    const academic = data.academic || {};
+    const imported = {
+      ...this._state,
+      profile: data.profile || this._state.profile,
+      terms: Array.isArray(academic.terms) && academic.terms.length ? academic.terms : this._state.terms,
+      courses: Array.isArray(academic.courses) && academic.courses.length ? academic.courses : this._state.courses,
+      schedule: Array.isArray(academic.schedule) && academic.schedule.length ? academic.schedule : this._state.schedule,
+      grades: Array.isArray(academic.grades) && academic.grades.length ? academic.grades : this._state.grades,
+      selectedCourses: Array.isArray(academic.selectedCourses) && academic.selectedCourses.length
+        ? academic.selectedCourses
+        : this._state.selectedCourses,
+      academicProgress: academic.academicProgress || this._state.academicProgress,
+      exams: Array.isArray(academic.exams) && academic.exams.length ? academic.exams : this._state.exams,
+      assignments: Array.isArray(academic.assignments) && academic.assignments.length
+        ? academic.assignments
+        : this._state.assignments,
+      notices: Array.isArray(academic.notices) && academic.notices.length ? academic.notices : this._state.notices,
+    };
+    this._state = imported;
+    this._state.updatedAt = new Date().toISOString();
+    await this._persist();
+    this._publishState();
+    return structuredClone(this._state);
+  }
+
+  // Mobile-only diagnostics helper (used by tests/devtools)
+  async getMobileStorageSummary() {
+    await this.init();
+    return this.store.storageSummary();
+  }
+
   async getApiStatus() {
     return {
       baseUrl: '',
