@@ -3,7 +3,9 @@
 // is not exposed to other apps or to exports/logs.
 // NOTE: @capacitor/filesystem mkdir THROWS when the target already exists
 // (even with recursive:true), so every mkdir is wrapped in a tolerant helper.
-import { Filesystem, Directory } from '@capacitor/filesystem';
+// IMPORTANT: all readFile/writeFile MUST specify Encoding.UTF8 — the default
+// is base64, which causes "bad base-64" on plain text content.
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 
 const DATA_ROOT = 'theia/data';
 
@@ -17,10 +19,8 @@ export function createCapacitorFilesystemBackend({ directory = Directory.Data, b
     } catch (error) {
       const message = String(error?.message || error || '');
       if (/already exists|EEXIST|exist/i.test(message)) {
-        // Directory exists — exactly what we wanted.
         return;
       }
-      // Re-check existence: if it now exists, treat as success.
       try {
         await Filesystem.stat({ path: p, directory });
         return;
@@ -33,7 +33,7 @@ export function createCapacitorFilesystemBackend({ directory = Directory.Data, b
   return {
     name: 'capacitor-filesystem',
     async readFile(p) {
-      const result = await Filesystem.readFile({ path: path(p), directory });
+      const result = await Filesystem.readFile({ path: path(p), directory, encoding: Encoding.UTF8 });
       return result.data;
     },
     async writeFile(p, content) {
@@ -43,7 +43,7 @@ export function createCapacitorFilesystemBackend({ directory = Directory.Data, b
       const base = path('');
       await ensureDir(base);
       if (dir) await ensureDir(path(dir));
-      await Filesystem.writeFile({ path: full, directory, data: content });
+      await Filesystem.writeFile({ path: full, directory, data: content, encoding: Encoding.UTF8 });
     },
     async exists(p) {
       try {
