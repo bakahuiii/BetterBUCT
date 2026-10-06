@@ -12,3 +12,8 @@ app/android/capacitor-cordova-android-plugins/
 app/android/keystore.properties
 *.keystore
 *.jks
+
+# 本地构建产物；正式 APK 通过 GitHub Release 附件发布
+release/*.apk
+release/*.apk.sha256
+.tmp/
