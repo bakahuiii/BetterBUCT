@@ -1,6 +1,6 @@
 {
   "name": "betterbuct-mobile",
-  "version": "0.2.26",
+  "version": "0.2.27",
   "private": true,
   "description": "BetterBUCT Android — Capacitor 原生壳 + 北化校园工作台",
   "type": "module",

@@ -14,8 +14,10 @@
 
 - `applicationId`: `io.github.bakahuiii.theia.mobile`（为兼容旧版本，暂不改名）
 - 显示名称：`BetterBUCT`
-- `versionCode`: `26`
-- `versionName`: `0.2.26`
+- `versionCode`: `27`
+- `versionName`: `0.2.27`
+
+当前 `0.2.27` 是仅用于验证自动更新链路的测试包；稳定版仍为 `0.2.26`。测试包虽然使用普通公开 Release 以便 `/releases/latest` 检查接口发现，但不建议普通用户安装。
 - 最低 Android API：`23`
 - 编译/目标 API：`35`
 
@@ -44,10 +46,10 @@ npm run android:release
 app/android/app/build/outputs/apk/release/app-release.apk
 ```
 
-发布前将 APK 重命名为统一的产品和版本格式，例如 `BetterBUCT-Android-0.2.26-release.apk`，再生成同名 `.sha256` 文件。PowerShell 示例：
+发布前将 APK 重命名为统一的产品和版本格式，例如 `BetterBUCT-Android-0.2.27-release.apk`，再生成同名 `.sha256` 文件。PowerShell 示例：
 
 ```powershell
-$apk = 'release\BetterBUCT-Android-0.2.26-release.apk'
+$apk = 'release\BetterBUCT-Android-0.2.27-release.apk'
 Get-FileHash $apk -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($apk))" } | Set-Content "$apk.sha256" -Encoding utf8
 ```
 
@@ -56,12 +58,12 @@ Get-FileHash $apk -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(
 使用 Android SDK 中与当前 SDK 匹配的工具检查包名和版本：
 
 ```powershell
-aapt2 dump badging release\BetterBUCT-Android-0.2.26-release.apk | Select-String 'package:|application-label:'
-apksigner verify --verbose release\BetterBUCT-Android-0.2.26-release.apk
-Get-FileHash release\BetterBUCT-Android-0.2.26-release.apk -Algorithm SHA256
+aapt2 dump badging release\BetterBUCT-Android-0.2.27-release.apk | Select-String 'package:|application-label:'
+apksigner verify --verbose release\BetterBUCT-Android-0.2.27-release.apk
+Get-FileHash release\BetterBUCT-Android-0.2.27-release.apk -Algorithm SHA256
 ```
 
-期望看到 `io.github.bakahuiii.theia.mobile`、`BetterBUCT`、`versionCode 26` 和 `versionName 0.2.26`；签名包应通过 `apksigner verify`。将本地哈希与上传到 GitHub Release 的 `.sha256` 附件读回比较。
+期望看到 `io.github.bakahuiii.theia.mobile`、`BetterBUCT`、`versionCode 27` 和 `versionName 0.2.27`；签名包应通过 `apksigner verify`。将本地哈希与上传到 GitHub Release 的 `.sha256` 附件读回比较。
 
 ## GitHub Release
 

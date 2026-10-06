@@ -19,7 +19,7 @@ window.__THEIA_BOOTED__ = true;
 
 // 初始化崩溃收集
 import { initCrashReporter } from './crash-reporter';
-initCrashReporter('0.2.26');
+initCrashReporter('0.2.27');
 
 // 初始化开机自启动监听
 import { initBootReceiver } from './boot-receiver';
