@@ -10,5 +10,6 @@ export async function copyFile() { throw new Error('fs.copyFile is not available
 export async function rename() { throw new Error('fs.rename is not available in the mobile WebView'); }
 export async function open() { throw new Error('fs.open is not available in the mobile WebView'); }
 export async function lstat() { throw new Error('fs.lstat is not available in the mobile WebView'); }
+export async function realpath() { throw new Error('fs.realpath is not available in the mobile WebView'); }
 export function existsSync() { return false; }
-export default { readFile, writeFile, mkdir, readdir, stat, rm, copyFile, rename, open, lstat, existsSync };
+export default { readFile, writeFile, mkdir, readdir, stat, rm, copyFile, rename, open, lstat, realpath, existsSync };

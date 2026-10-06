@@ -8,7 +8,6 @@ import {
   GraduationCap,
   LayoutDashboard,
   Sparkles,
-  Map as MapIcon,
   Settings,
   Wrench,
   MessagesSquare,
@@ -26,10 +25,9 @@ export const navItems: Array<{ id: ViewId; label: string; icon: LucideIcon }> =
     { id: "progress", label: "学业", icon: GraduationCap },
     { id: "courses", label: "课程", icon: BookOpen },
     { id: "selection", label: "抢课", icon: Crosshair },
-    { id: "assignments", label: "作业", icon: CheckCircle2 },
+    { id: "assignments", label: "作业与测试", icon: CheckCircle2 },
     { id: "notices", label: "通知与邮箱", icon: MessagesSquare },
     { id: "tools", label: "学习工具", icon: Wrench },
-    { id: "map", label: "校园地图", icon: MapIcon },
     { id: "settings", label: "设置与接入", icon: Settings },
   ];
 
@@ -38,7 +36,7 @@ export const navGroups: Array<{ label: string; items: ViewId[] }> = [
   { label: "ACADEMIC", items: ["exams", "grades", "progress", "courses"] },
   {
     label: "TOOLS",
-    items: ["selection", "notices", "tools", "map", "settings"],
+    items: ["selection", "notices", "tools", "settings"],
   },
 ];
 
@@ -52,7 +50,6 @@ export const viewTitles: Record<ViewId, { title: string; subtitle: string }> = {
     subtitle: "按问题读取本地校园数据，并保留可追溯证据",
   },
   schedule: { title: "本周课表", subtitle: "按照星期和节次查看当前学期课程" },
-  map: { title: "校园地图", subtitle: "昌平校区 · 教学地点定位" },
   exams: { title: "考试安排", subtitle: "考试时间、地点、校区和座号" },
   grades: { title: "成绩", subtitle: "课程成绩、学分和绩点汇总" },
   progress: {
@@ -73,6 +70,10 @@ export const viewTitles: Record<ViewId, { title: string; subtitle: string }> = {
     title: "通知与邮箱",
     subtitle: "校园邮箱、教务系统与北化在线THEOL动态集中查看",
   },
+  notifications: {
+    title: "通知提醒",
+    subtitle: "课程、作业和考试的本地通知管理",
+  },
   tools: { title: "学习工具", subtitle: "文档、空闲教室与校园工具" },
-  settings: { title: "设置与接入", subtitle: "同步、导出和 THEIA 数据接口" },
+  settings: { title: "设置与接入", subtitle: "同步、导出和 BetterBUCT 数据接口" },
 };

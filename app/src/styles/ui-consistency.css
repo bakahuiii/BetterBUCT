@@ -1,0 +1,312 @@
+/* Final frontend consistency audit. Keep page-specific layouts intact while
+ * enforcing one surface, control, focus, and overflow language. */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+.app-shell,
+.app-body,
+.workspace,
+.content-area,
+.tools-view,
+.tools-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-shell,
+.app-body,
+.workspace,
+.content-area { overflow-x: hidden; }
+
+img,
+svg,
+video,
+canvas { max-width: 100%; }
+
+button,
+input,
+select,
+textarea { max-width: 100%; }
+
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
+.tools-view { gap: 0; }
+.tools-tab-bar {
+  align-items: stretch;
+  border-radius: var(--theia-surface-radius, 14px);
+  box-shadow: var(--theia-surface-shadow);
+}
+.tools-tab {
+  min-height: 40px;
+  padding-inline: 10px;
+  text-align: center;
+}
+.tools-content { margin-top: 16px; }
+
+.tools-notification-view {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding-bottom: 8px;
+}
+
+.tools-notification-view .view-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 12px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.tools-notification-view .view-toolbar h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.tools-notification-view .view-toolbar h1 svg { color: var(--primary); flex: 0 0 auto; }
+
+.tools-notification-view .sync-button,
+.tools-notification-view .permission-prompt button,
+.tools-notification-view .battery-guide-dialog button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 13px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: var(--theia-control-radius, 9px);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tools-notification-view .sync-button:hover,
+.tools-notification-view .permission-prompt button:hover,
+.tools-notification-view .battery-guide-dialog button:hover {
+  filter: brightness(.96);
+}
+
+.tools-notification-view .sync-message,
+.tools-notification-view .battery-guide-banner,
+.tools-notification-view .warning-banner,
+.tools-notification-view .settings-section {
+  min-width: 0;
+  margin: 0;
+  border-radius: var(--theia-surface-radius, 14px);
+  box-shadow: var(--theia-surface-shadow);
+}
+
+.tools-notification-view .sync-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  font-size: 11px;
+}
+
+.tools-notification-view .battery-guide-banner,
+.tools-notification-view .warning-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 13px;
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--warning-soft) 58%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--warning) 25%, var(--border));
+}
+
+.tools-notification-view .battery-guide-banner > svg,
+.tools-notification-view .warning-banner > svg {
+  flex: 0 0 auto;
+  color: var(--warning);
+}
+
+.tools-notification-view .battery-guide-banner p,
+.tools-notification-view .warning-banner p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.tools-notification-view .battery-guide-banner button {
+  min-height: 30px;
+  padding-inline: 10px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning-soft) 78%, var(--card));
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--border));
+}
+
+.tools-notification-view .battery-guide-banner .dismiss {
+  grid-column: 3;
+  color: var(--muted-foreground);
+  background: transparent;
+  border-color: var(--border);
+}
+
+.tools-notification-view .settings-section {
+  overflow: hidden;
+  background: var(--theia-global-surface, var(--card));
+  border: 1px solid var(--theia-surface-border, var(--border));
+}
+
+.tools-notification-view .settings-section h3 {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--secondary) 68%, var(--card));
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.tools-notification-view .setting-row {
+  min-width: 0;
+  min-height: 52px;
+  padding: 11px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+}
+
+.tools-notification-view .setting-row:last-child { border-bottom: 0; }
+.tools-notification-view .setting-info { min-width: 0; }
+.tools-notification-view .setting-info > div { min-width: 0; }
+.tools-notification-view .setting-info strong,
+.tools-notification-view .setting-info span { overflow-wrap: anywhere; }
+.tools-notification-view .setting-row select {
+  min-height: 34px;
+  padding: 0 10px;
+  color: var(--foreground);
+  background: var(--secondary);
+  border: 1px solid var(--input);
+  border-radius: var(--theia-control-radius, 9px);
+  font-size: 11px;
+}
+
+.tools-notification-view .permission-prompt {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 22px 14px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.tools-notification-view .pending-info {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--secondary) 64%, var(--card));
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+}
+
+.tools-notification-view .battery-guide-dialog {
+  background: color-mix(in srgb, var(--foreground) 38%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.tools-notification-view .battery-guide-dialog .dialog-content {
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--theia-surface-radius, 14px);
+  box-shadow: var(--theia-surface-shadow-hover);
+}
+
+@media (max-width: 720px) {
+  .content-area > *,
+  .tools-content > *,
+  .tools-notification-view > * { min-width: 0; }
+
+  .tools-tab-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .tools-tab {
+    min-height: 42px;
+    padding-inline: 5px;
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .tools-notification-view { gap: 12px; }
+  .tools-notification-view .view-toolbar {
+    min-height: 62px;
+    padding: 13px 14px;
+    background: var(--theia-global-surface, var(--card));
+    border: 1px solid var(--theia-surface-border, var(--border));
+    border-radius: var(--theia-surface-radius, 14px);
+    box-shadow: var(--theia-surface-shadow);
+  }
+  .tools-notification-view .view-toolbar h1 { font-size: 17px; }
+  .tools-notification-view .battery-guide-banner,
+  .tools-notification-view .warning-banner {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .tools-notification-view .warning-banner > div:last-child {
+    grid-column: 2;
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px !important;
+    margin-top: 2px;
+  }
+
+  .tools-notification-view .warning-banner > div:last-child button {
+    min-height: 32px;
+    padding: 0 10px;
+    color: var(--warning);
+    background: color-mix(in srgb, var(--warning-soft) 78%, var(--card));
+    border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border));
+    border-radius: var(--theia-control-radius, 9px);
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .tools-notification-view .battery-guide-banner button {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .tools-notification-view .battery-guide-banner .dismiss {
+    grid-column: 2;
+  }
+  .tools-notification-view .setting-row {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .tools-notification-view .setting-row select,
+  .tools-notification-view .days-checkboxes {
+    flex: 0 0 auto;
+  }
+}

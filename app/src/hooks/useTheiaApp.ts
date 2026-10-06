@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { bridge, disconnectedStatus, isDesktop } from "../bridge";
+import { bridge, disconnectedStatus, isDesktop, isMobile } from "../bridge";
 import { createLatestApiStatusLoader } from "./runtime-api-status.mjs";
 import {
   createSyncFailureObserver,
   describeSyncFreshness,
+  isCampusAuthFailure,
+  isRateLimitFailure,
   sanitizeSyncFailure,
+  syncStartedDuringRenderer,
 } from "./sync-status.mjs";
 import { navItems } from "../ui/navigation";
 import { relativeTime, type ViewId } from "../ui/app-shared";
 import type {
   AcademicApiCredentialStatus,
   ActivityLogEntry,
+  ApiStatus,
   AuthStatus,
   CampusState,
   CourseSelectionCatalogPage,
@@ -104,12 +108,51 @@ export function useTheiaApp() {
       error instanceof Error ? error.message : String(error),
       "error",
     ), [setMsg]);
+  const markAuthRequired = useCallback((error: unknown = "\u6821\u56ed\u4f1a\u8bdd\u5df2\u5931\u6548") => {
+    const message = sanitizeSyncFailure(error) || "\u6821\u56ed\u4f1a\u8bdd\u5df2\u5931\u6548";
+    // Keep the recovery action in the persistent topbar banner. A transient
+    // message bar only says “请重新登录” and has no action on narrow Android
+    // screens, which made an expired session look unrecoverable.
+    setAuth((current) => ({
+      jwglxt: {
+        ...current.jwglxt,
+        connected: false,
+        unchecked: false,
+        authPending: false,
+        authRequired: true,
+        mode: "unified",
+        error: message,
+      },
+      theol: {
+        ...current.theol,
+        connected: false,
+        unchecked: false,
+        authPending: false,
+        authRequired: true,
+        mode: "unified",
+        error: message,
+      },
+    }));
+  }, []);
   const showDataError = useCallback((error: unknown) => {
     const text = sanitizeSyncFailure(error);
+    if (isCampusAuthFailure(error) || isCampusAuthFailure(text)) {
+      markAuthRequired(error);
+      setMsg(null);
+      setSyncFailure(null);
+      setRuntimeSyncError(null);
+      return;
+    }
+    if (isRateLimitFailure(error) || isRateLimitFailure(text)) {
+      setMsg("\u6821\u56ed\u7cfb\u7edf\u6682\u65f6\u9650\u5236\u8bbf\u95ee\uff0c\u5df2\u4fdd\u7559\u672c\u5730\u6570\u636e\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002", "info");
+      setSyncFailure(null);
+      setRuntimeSyncError(null);
+      return;
+    }
     setMsg(text, "error");
     setSyncFailure(text);
     setRuntimeSyncError(text);
-  }, [setMsg]);
+  }, [markAuthRequired, setMsg]);
   const syncFailureObserver = useMemo(() => createSyncFailureObserver({
     report: (error: string) => showDataError(error),
     recover: () => {
@@ -118,6 +161,12 @@ export function useTheiaApp() {
     },
   }), [showDataError]);
   const [apiBase, setApiBase] = useState("");
+  const [apiStatus, setApiStatus] = useState<ApiStatus>({
+    baseUrl: "",
+    host: "",
+    port: 0,
+    apiEndpoints: [],
+  });
   const [calendarAssetUrls, setCalendarAssetUrls] = useState<
     Partial<Record<"calendar" | "teachingSchedule" | "weeklyCalendar", string>>
   >({});
@@ -159,6 +208,7 @@ export function useTheiaApp() {
   const [advisorActionPendingId, setAdvisorActionPendingId] = useState<string | null>(null);
   const courseSelectionCandidatesRequestSequence = useRef(0);
   const advisorOverviewRequestSequence = useRef(0);
+  const rendererStartedAt = useRef(Date.now());
 
   const applyRendererSnapshot = useCallback((snapshot: CampusState) => {
     setState(projectBrowserRendererSnapshot(snapshot));
@@ -173,7 +223,7 @@ export function useTheiaApp() {
     // the terminal event while it is being created or while Electron is
     // recovering a saved session. The persisted timestamps are authoritative
     // and let the UI reconcile the live indicator from the next snapshot.
-    if (syncSnapshotIsPending(snapshot.sync)) {
+    if (syncSnapshotIsPending(snapshot.sync) && syncStartedDuringRenderer(snapshot.sync, rendererStartedAt.current)) {
       setSyncing(true);
       setSyncStage("all");
       setSyncProgress("正在更新校园数据…");
@@ -185,6 +235,12 @@ export function useTheiaApp() {
   }, []);
 
   const refreshAdvisorOverview = useCallback(async () => {
+    if (isMobile) {
+      setAdvisorOverview(null);
+      setAdvisorError(null);
+      setAdvisorLoading(false);
+      return null;
+    }
     const requestSequence = ++advisorOverviewRequestSequence.current;
     setAdvisorLoading(true);
     setAdvisorOverview(null);
@@ -251,6 +307,7 @@ export function useTheiaApp() {
       load: () => bridge.getApiStatus(),
       apply: (api: Awaited<ReturnType<typeof bridge.getApiStatus>>) => {
         if (active) {
+          setApiStatus(api);
           setApiBase(api.baseUrl);
           setCalendarAssetUrls(api.academicCalendarAssets || {});
           setAcademicPlanAssetBaseUrl(api.academicPlanAssetBaseUrl || "");
@@ -334,7 +391,38 @@ export function useTheiaApp() {
       setMsg(`新邮件 · ${mail.subject || "(无主题)"}`, "info");
     });
     const offProgress = bridge.onSyncProgress((progress) => {
-      if (progress.scope === "domain") return;
+      if (progress.scope === "domain") {
+        // Assignment capture runs after the visible campus sync. Keep its
+        // short background phase visible so the task list does not look stuck
+        // while the per-course scan is still running.
+        if (progress.stage === "assignments") {
+          if (progress.status === "syncing") {
+            setSyncing(true);
+            setSyncStage("assignments");
+            setSyncProgress(progress.label || "正在后台获取作业与测试…");
+          } else {
+            setSyncing(false);
+            setSyncStage(null);
+            setSyncProgress(
+              progress.status === "error"
+                ? "作业与测试更新失败"
+                : "作业与测试更新完成",
+            );
+          }
+        }
+        return;
+      }
+      if (progress.background && progress.status === "error") {
+        if (progress.authRequired) {
+          markAuthRequired(progress.error || "\u6821\u56ed\u4f1a\u8bdd\u5df2\u5931\u6548");
+          setMsg(null);
+        }
+        setSyncFailure(null);
+        setRuntimeSyncError(null);
+        setSyncing(false);
+        setSyncStage(null);
+        return;
+      }
       if (progress.stage === "all" && progress.status === "syncing") {
         syncFailureObserver.beginAttempt();
         setSyncFailure(null);
@@ -393,13 +481,37 @@ export function useTheiaApp() {
       offNewMail();
       offProgress();
     };
-  }, [applyRendererSnapshot, refreshAdvisorOverview, setError, setMsg, syncFailureObserver]);
+  }, [applyRendererSnapshot, markAuthRequired, refreshAdvisorOverview, setError, setMsg, syncFailureObserver]);
 
   useEffect(() => {
-    if (!state) return;
-    const interval = window.setInterval(() => void refreshAdvisorOverview(), 60_000);
-    return () => window.clearInterval(interval);
-  }, [refreshAdvisorOverview, state]);
+    let active = true;
+    const reconcile = async () => {
+      try {
+        const snapshot = await bridge.getRendererSnapshot();
+        if (!active) return;
+        // Progress events are transient. If the renderer missed the terminal
+        // event, reconcile the banner against the persisted sync marker
+        // instead of leaving the whole workspace in a permanent syncing state.
+        if (syncSnapshotIsPending(snapshot.sync) && syncStartedDuringRenderer(snapshot.sync, rendererStartedAt.current)) return;
+        setSyncing(false);
+        setSyncStage(null);
+        setSyncProgress(null);
+      } catch {
+        // Keep the current indicator until an authoritative snapshot is read.
+      }
+    };
+    const advisorInterval = state
+      ? window.setInterval(() => void refreshAdvisorOverview(), 60_000)
+      : null;
+    const syncInterval = syncing && syncStage !== "assignments"
+      ? window.setInterval(() => void reconcile(), 5_000)
+      : null;
+    return () => {
+      active = false;
+      if (advisorInterval !== null) window.clearInterval(advisorInterval);
+      if (syncInterval !== null) window.clearInterval(syncInterval);
+    };
+  }, [refreshAdvisorOverview, state, syncStage, syncing]);
 
   useEffect(() => {
     if (settingsOpen) void refreshActivityLog();
@@ -419,20 +531,48 @@ export function useTheiaApp() {
     auth.theol.connected ||
     (state?.settings.academicApiEnabled && academicApiCredentialStatus?.saved),
   );
-  const requestLogin = async () => {
+  const requestLogin = async (options: { interactive?: boolean } = {}) => {
+    // Android can always open the restricted CAS page for manual entry. Do
+    // not turn a missing/stale vault record into a dead "设置账号" button.
     if (isDesktop && !credentials.saved) {
       setCredentialDismissed(false);
-      return;
+      return false;
     }
-    await bridge.login();
+    try {
+      await bridge.login({ interactive: true, ...options });
+      return true;
+    } catch (error) {
+      // A user-cancelled native login is an ordinary action result, not an
+      // uncaught renderer rejection. The mobile bootstrap overlay treats any
+      // unhandled rejection as a fatal startup error, which used to blank the
+      // whole app and hide the cached assignment page.
+      const text = error instanceof Error ? error.message : String(error ?? "");
+      if (/(?:统一身份认证|登录|请求)已取消|用户取消|cancell?ed|aborted/iu.test(text)) {
+        setMsg("已取消统一身份认证，仍可查看本机已有数据。", "info");
+        setSyncFailure(null);
+        setRuntimeSyncError(null);
+      } else {
+        showDataError(error);
+      }
+      return false;
+    }
   };
   const sync = async () => {
     if (!hasSession) {
       try {
-        await requestLogin();
-        if (credentials.saved) setMsg("正在恢复学校统一身份认证会话");
+        if (credentials.saved) {
+          setSyncing(true);
+          setSyncProgress("正在恢复学校统一身份认证会话");
+          setMsg(null);
+        }
+        // This branch is reached from a user-initiated sync/login button.
+        // Open a real manual CAS page rather than silently retrying stale
+        // saved credentials.
+        await requestLogin({ interactive: true });
       } catch (error) {
         showDataError(error);
+      } finally {
+        if (credentials.saved) setSyncing(false);
       }
       return;
     }
@@ -442,7 +582,7 @@ export function useTheiaApp() {
     setSyncFailure(null);
     setRuntimeSyncError(null);
     try {
-      const snapshot = await bridge.syncNow();
+      const snapshot = await bridge.syncNow({ background: false });
       syncFailureObserver.observe(snapshot);
       applyRendererSnapshot(snapshot);
       if (!snapshot.sync.lastError) {
@@ -455,13 +595,13 @@ export function useTheiaApp() {
       setSyncing(false);
     }
   };
-  const refreshAcademicDomain = async (domain: SyncRetryDomain) => {
+  const refreshAcademicDomain = async (domain: SyncRetryDomain, successMessage = "数据已更新。") => {
     if (academicDomainRefreshing) return;
     setAcademicDomainRefreshing(domain);
     try {
       const snapshot = await bridge.retrySyncDomain(domain);
       applyRendererSnapshot(snapshot);
-      setMsg("数据已更新。", "success");
+      setMsg(successMessage, "success");
     } catch (error) {
       setError(error);
     } finally {
@@ -538,11 +678,19 @@ export function useTheiaApp() {
     try {
       const result = await bridge.openSchedulePdf();
       if (!result.canceled)
-        setMsg(`课表 PDF 已保存：${result.filePath || "文档/THEIA/课表"}`, "success");
+        setMsg(`课表 PDF 已保存：${result.filePath || "文档/BetterBUCT/课表"}`, "success");
     } catch (error) {
       setError(error);
     } finally {
       setExportingSchedulePdf(false);
+    }
+  };
+  const openScheduleDirectory = async () => {
+    try {
+      await bridge.openScheduleDirectory();
+      setMsg("已打开课表 PDF 文件夹。", "success");
+    } catch (error) {
+      setError(error);
     }
   };
   const runCourseWork = async (
@@ -607,6 +755,13 @@ export function useTheiaApp() {
   const openAssignmentSource = async (assignmentId: string) => {
     try {
       await bridge.openAssignmentSource(assignmentId);
+    } catch (error) {
+      setError(error);
+    }
+  };
+  const openCourseMaterial = async (courseId: string, materialId: string) => {
+    try {
+      await bridge.openCourseMaterial(courseId, materialId);
     } catch (error) {
       setError(error);
     }
@@ -736,7 +891,7 @@ export function useTheiaApp() {
   };
   const removeCourseSelectionTarget = async (id: string) => {
     if (typeof bridge.removeCourseSelectionTarget !== "function") {
-      setMsg("暂时无法移除目标，请重启 THEIA 后重试。", "info");
+      setMsg("暂时无法移除目标，请重启 BetterBUCT 后重试。", "info");
       return;
     }
     try {
@@ -806,6 +961,7 @@ export function useTheiaApp() {
         "selected-courses": 82,
         theol: 88,
         notices: 94,
+        assignments: 96,
       }[syncStage || ""] || 18
     : 100;
   const syncFreshness = useMemo<SyncFreshness>(() => describeSyncFreshness(state?.sync, {
@@ -814,7 +970,9 @@ export function useTheiaApp() {
     now: freshnessNow,
     formatTime: (value: string) => relativeTime(value, freshnessNow),
   }) as SyncFreshness, [freshnessNow, runtimeSyncError, state?.sync, syncing]);
-  const paletteItems = navItems.filter(({ label }) =>
+  const mobileUnsupportedViews = new Set(["advisor", "selection", "mailbox"]);
+  const paletteItems = navItems.filter(({ id, label }) =>
+    (!isMobile || !mobileUnsupportedViews.has(id)) &&
     label.toLowerCase().includes(paletteQuery.trim().toLowerCase()),
   );
   const navigate = useCallback((nextView: ViewId) => {
@@ -866,6 +1024,7 @@ export function useTheiaApp() {
     syncFailure,
     syncFreshness,
     apiBase,
+    apiStatus,
     calendarAssetUrls,
     academicPlanAssetBaseUrl,
     credentialStatus,
@@ -916,6 +1075,7 @@ export function useTheiaApp() {
     academicDomainRefreshing,
     refreshAcademicDomain,
     exportSchedulePdf,
+    openScheduleDirectory,
     prepareCourseWork,
     processCourseWorkWithModel,
     generateNotes,
@@ -924,6 +1084,7 @@ export function useTheiaApp() {
     openAnswerPdf,
     openCourseWork,
     openAssignmentSource,
+    openCourseMaterial,
     importCourseWorkFile,
     openSubmission,
     applyTestAnswers,

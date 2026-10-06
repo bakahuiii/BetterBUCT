@@ -66,8 +66,8 @@ export function IrisCompanionSettings({ onMessage }: { onMessage: (message: stri
       <div className="settings-title">
         <div className="settings-icon teal"><KeyRound size={20} /></div>
         <div>
-          <h2>Iris companion</h2>
-          <p>内置 QQ 校园助手。默认只显示 THEIA 只读能力，其他 provider 可在 Iris 控制面板中显示或关闭。</p>
+          <h2>Iris 助手</h2>
+          <p>本机 QQ 校园助手。默认只显示 BetterBUCT 只读能力，其他 provider 可在 Iris 控制面板中显示或关闭。</p>
         </div>
         <button className="icon-button" data-tooltip="刷新 Iris 状态" aria-label="刷新 Iris 状态" onClick={() => void refresh()} disabled={busy}>
           <RefreshCw size={16} className={busy ? "spinning" : ""} />
@@ -76,7 +76,7 @@ export function IrisCompanionSettings({ onMessage }: { onMessage: (message: stri
       <div className="settings-inline-status">
         <span>{status?.running ? "运行中" : "未运行"}</span>
         <span>{status?.configured ? "凭据已配置" : "尚未配置 QQ 凭据"}</span>
-        <span>可见：{(status?.visibleProviders || ["theia"]).map((provider) => provider === "theia" ? "THEIA" : provider).join("、")}</span>
+        <span>可见：{(status?.visibleProviders || ["theia"]).map((provider) => provider === "theia" ? "BetterBUCT" : provider).join("、")}</span>
         {status?.controlUrl ? <span>控制面板：{status.controlUrl}</span> : null}
       </div>
       <div className="settings-actions">

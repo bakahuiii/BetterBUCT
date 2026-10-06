@@ -1,3 +1,4 @@
+import { APP_VERSION_LABEL } from '../app-identity.mjs';
 // Stage-0 mock campus data from desktop demo.ts (serialized to JSON).
 // This module re-hydrates the mock state with fresh timestamps so demo
 // items always appear current. Loading is lazy: module evaluation must not
@@ -12,7 +13,7 @@ function isoAfter(hours) {
 
 export function createMockState() {
   const state = structuredClone(demoState);
-  state.appVersion = '0.5.1-mobile';
+  state.appVersion = APP_VERSION_LABEL;
   const now = new Date().toISOString();
   state.createdAt = now;
   state.updatedAt = now;

@@ -1,1152 +1,170 @@
-import {
-  ArrowLeftRight,
-  Blend,
-  ChevronDown,
-  ImagePlus,
-  Monitor,
-  Moon,
-  Palette,
-  Plus,
-  RotateCcw,
-  SlidersHorizontal,
-  Sparkles,
-  Sun,
-  Trash2,
-  X,
-} from "lucide-react";
-import {
-  type FormEvent,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { bridge, isDesktop } from "../../bridge";
-import {
-  type AppearanceMode,
-  useAppearance,
-} from "../../hooks/useAppearance";
-import {
-  type ThemePreset,
-  usePersonalization,
-} from "../../hooks/usePersonalization";
-import {
-  BUCT_LAKE_PRESET,
-  matchesVisualPreset,
-  VISUAL_PRESET_GROUPS,
-  type VisualPreset,
-  type VisualPresetGroup,
-} from "../../lib/appearance-presets";
-import { deriveGradientPalette } from "../../lib/gradient-map";
-import {
-  DEFAULT_PARALLAX_TUNING,
-  PARALLAX_TUNING_EVENT,
-  PARALLAX_TUNING_GROUPS,
-  publishParallaxTuning,
-  readParallaxTuning,
-  type ParallaxTuning,
-} from "../../components/parallax3d/parallax-tuning";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Check, Monitor, Moon, Palette, RotateCcw, Sun } from "lucide-react";
+import { type AppearanceMode, useAppearance } from "../../hooks/useAppearance";
+import { usePersonalization, type BackgroundPreset } from "../../hooks/usePersonalization";
 
-const ZOOM_PRESETS = [75, 90, 100, 110, 125, 150] as const;
-
-const MODE_OPTIONS: Array<{
+type ModeOption = {
   id: AppearanceMode;
   label: string;
+  description: string;
   icon: typeof Sun;
-}> = [
-  { id: "light", label: "浅色", icon: Sun },
-  { id: "dark", label: "深色", icon: Moon },
-  { id: "system", label: "跟随系统", icon: Monitor },
+};
+
+const MODE_OPTIONS: ModeOption[] = [
+  { id: "light", label: "浅色", description: "清晰明亮", icon: Sun },
+  { id: "dark", label: "深色", description: "低眩光", icon: Moon },
+  { id: "system", label: "跟随系统", description: "自动切换", icon: Monitor },
 ];
 
-const PRESETS: Array<{
-  id: ThemePreset;
+const ACCENT_OPTIONS = [
+  { id: "buct-blue", label: "北化蓝", shadow: "#071b32", highlight: "#1296b6" },
+  { id: "teal", label: "青绿色", shadow: "#071c1c", highlight: "#1d8278" },
+  { id: "violet", label: "紫罗兰", shadow: "#17132f", highlight: "#725dc4" },
+  { id: "amber", label: "琥珀金", shadow: "#2a1a08", highlight: "#bd8526" },
+  { id: "rose", label: "玫瑰粉", shadow: "#2b1022", highlight: "#bc4f83" },
+  { id: "slate", label: "雾蓝灰", shadow: "#101722", highlight: "#396eb8" },
+] as const;
+
+const BACKGROUND_OPTIONS: Array<{
+  id: BackgroundPreset;
   label: string;
-  detail: string;
+  light: string;
+  dark: string;
 }> = [
-  // The persisted ids predate the visible names and were wired in reverse.
-  // Keep the ids for migration, but present the style they actually render.
-  { id: "midnight", label: "Classic", detail: "平衡、清透" },
-  { id: "classic", label: "Midnight", detail: "深夜墨绿" },
+  { id: "slate", label: "雾蓝", light: "#f3f6fa", dark: "#0e1622" },
+  { id: "graphite", label: "石墨", light: "#f3f3f4", dark: "#111318" },
+  { id: "indigo", label: "靛蓝", light: "#f2f4fb", dark: "#0d1323" },
+  { id: "warm", label: "暖沙", light: "#faf6f0", dark: "#1a1513" },
+  { id: "paper", label: "纸白", light: "#fffdf8", dark: "#171715" },
 ];
 
-export function AppearanceSettings({
-  onMessage,
-}: {
-  onMessage: (message: string) => void;
-}) {
-  const { mode, resolvedMode, setMode, zoom, setZoom } = useAppearance();
-  const {
-    preferences,
-    setPreset,
-    setAppBackground,
-    setBackgroundBlur,
-    setBackgroundTransparency,
-    setBackgroundImage,
-    setBackgroundTexture,
-    setBackgroundMotion,
-    setGradientMap,
-    applyVisualSettings,
-    applySeasonalVisualSettings,
-    saveCustomVisualPreset,
-    deleteCustomVisualPreset,
-  } = usePersonalization();
-  const [motionOpen, setMotionOpen] = useState(false);
-  const [gradientOpen, setGradientOpen] = useState(false);
-  const [savePresetOpen, setSavePresetOpen] = useState(false);
-  const [customPresetName, setCustomPresetName] = useState("");
-  const [savePresetError, setSavePresetError] = useState("");
-  const [sceneTuning, setSceneTuning] = useState<ParallaxTuning>(() =>
-    readParallaxTuning(),
-  );
-  const sceneTuningRef = useRef(sceneTuning);
-  const hasBackground = preferences.background === "image";
-  const sceneEnabled = preferences.scene === "parallax-3d";
-  const duotoneActive = hasBackground && preferences.gradientMap.enabled;
-  const paletteSource =
-    preferences.gradientMap.syncPalette &&
-    preferences.backgroundPalette &&
-    preferences.backgroundPaletteSource === preferences.backgroundUrl
-      ? preferences.backgroundPalette
-      : preferences.gradientMap;
-  const gradientPalette = deriveGradientPalette(
-    paletteSource,
-    resolvedMode,
-  );
+function selectedAccentId(highlight: string) {
+  return ACCENT_OPTIONS.find((item) => item.highlight.toLowerCase() === String(highlight || "").toLowerCase())?.id || "custom";
+}
 
-  const applyPreset = (preset: (typeof PRESETS)[number]) => {
-    if (duotoneActive) return;
-    setPreset(preset.id);
+export function AppearanceSettings({ onMessage }: { onMessage: (message: string) => void }) {
+  const { mode, resolvedMode, setMode } = useAppearance();
+  const { preferences, setBackground, setGradientMap, reset } = usePersonalization();
+  const selectedAccent = selectedAccentId(preferences.gradientMap.highlight);
+  const activeMode = MODE_OPTIONS.find((option) => option.id === mode) || MODE_OPTIONS[2];
+  const ActiveModeIcon = activeMode.icon;
+
+  const applyAccent = (accent: (typeof ACCENT_OPTIONS)[number]) => {
+    setGradientMap({ shadow: accent.shadow, highlight: accent.highlight });
+    onMessage(`已切换强调色：${accent.label}`);
   };
 
-  const applyVisualPreset = (preset: VisualPreset) => {
-    const seasonalPreset = preset.id === BUCT_LAKE_PRESET?.id
-      ? BUCT_LAKE_PRESET
-      : null;
-    if (seasonalPreset) {
-      applySeasonalVisualSettings(
-        seasonalPreset,
-        seasonalPreset.seasonalVariants,
-      );
-    } else {
-      applyVisualSettings(preset);
-    }
-    onMessage(`已应用 ${preset.label} 外观；同步界面色板，不替换背景图片`);
-  };
-
-  const customVisualPresetGroup: VisualPresetGroup | null =
-    preferences.customVisualPresets.length > 0
-      ? {
-          label: "MY PRESETS",
-          detail: "保存在这台设备上的个人外观",
-          custom: true,
-          presets: preferences.customVisualPresets.map((preset) => ({
-            ...preset,
-            detail:
-              (preset.basePreset === "midnight" ? "Classic" : "Midnight") +
-              " · 本地预设",
-          })),
-        }
-      : null;
-  const visualPresetGroups = customVisualPresetGroup
-    ? [...VISUAL_PRESET_GROUPS, customVisualPresetGroup]
-    : VISUAL_PRESET_GROUPS;
-
-  const saveCurrentVisualPreset = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const savedPreset = saveCustomVisualPreset(customPresetName);
-    if (!savedPreset) {
-      setSavePresetError(
-        customPresetName.trim()
-          ? "最多可保存 16 套个人预设。"
-          : "请先为这套外观输入名称。",
-      );
-      return;
-    }
-    setCustomPresetName("");
-    setSavePresetError("");
-    setSavePresetOpen(false);
-    onMessage(`已将当前外观保存为“${savedPreset.label}”。`);
-  };
-
-  const swapGradientColors = () => {
-    setGradientMap({
-      shadow: preferences.gradientMap.highlight,
-      highlight: preferences.gradientMap.shadow,
-    });
-    onMessage("已对调双色映射的亮部与暗部颜色。");
-  };
-
-  const removeCustomVisualPreset = (preset: VisualPreset) => {
-    deleteCustomVisualPreset(preset.id);
-    onMessage(`已删除个人预设“${preset.label}”。`);
-  };
-
-  const updateGradientColor = (
-    field: "shadow" | "highlight",
-    value: string,
-  ) => {
-    setGradientMap({ [field]: value });
-  };
-
-  const updateGradientStop = (
-    field: "shadowPosition" | "highlightPosition",
-    value: number,
-  ) => {
-    const minimumGap = 4;
-    const nextValue =
-      field === "shadowPosition"
-        ? Math.min(value, preferences.gradientMap.highlightPosition - minimumGap)
-        : Math.max(value, preferences.gradientMap.shadowPosition + minimumGap);
-    setGradientMap({ [field]: nextValue });
-  };
-
-  const gradientPositionAtPointer = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    return Math.round(
-      Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)) *
-        100,
-    );
-  };
-
-  const moveNearestGradientStop = (
-    event: ReactPointerEvent<HTMLDivElement>,
-    field?: "shadowPosition" | "highlightPosition",
-  ) => {
-    const position = gradientPositionAtPointer(event);
-    const target =
-      field ??
-      (Math.abs(position - preferences.gradientMap.shadowPosition) <=
-      Math.abs(position - preferences.gradientMap.highlightPosition)
-        ? "shadowPosition"
-        : "highlightPosition");
-    updateGradientStop(target, position);
-    return target;
-  };
-
-  const handleGradientRampPointerDown = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (event.target instanceof HTMLInputElement) return;
-    const target = moveNearestGradientStop(event);
-    event.currentTarget.dataset.draggedGradientStop = target;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  };
-
-  const handleGradientRampPointerMove = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    const target = event.currentTarget.dataset.draggedGradientStop;
-    if (target !== "shadowPosition" && target !== "highlightPosition") return;
-    moveNearestGradientStop(event, target);
-  };
-
-  const handleGradientRampPointerEnd = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    delete event.currentTarget.dataset.draggedGradientStop;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
-
-  const chooseBackground = async () => {
-    try {
-      const result = await bridge.chooseAppBackground?.();
-      if (!result || result.canceled || !result.url) return;
-      setAppBackground("image", result);
-      onMessage("已应用客户端背景：" + (result.name || "图片"));
-    } catch (error) {
-      onMessage(error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const clearBackground = () => {
-    setAppBackground("none");
-    setMotionOpen(false);
-    setGradientOpen(false);
-    onMessage("已移除客户端背景");
-  };
-
-  useEffect(() => {
-    sceneTuningRef.current = sceneTuning;
-  }, [sceneTuning]);
-
-  useEffect(() => {
-    const onTuningChange = (event: Event) => {
-      const detail = (event as CustomEvent<{ tuning?: ParallaxTuning }>).detail;
-      if (detail?.tuning) {
-        sceneTuningRef.current = detail.tuning;
-        setSceneTuning(detail.tuning);
-      }
-    };
-    window.addEventListener(PARALLAX_TUNING_EVENT, onTuningChange);
-    return () => window.removeEventListener(PARALLAX_TUNING_EVENT, onTuningChange);
-  }, []);
-
-  const updateSceneTuning = <K extends keyof ParallaxTuning>(
-    key: K,
-    value: ParallaxTuning[K],
-  ) => {
-    // Keep the persistence/event side effect outside React's state updater.
-    // StrictMode may evaluate an updater more than once during development.
-    const next = { ...sceneTuningRef.current, [key]: value } as ParallaxTuning;
-    sceneTuningRef.current = next;
-    setSceneTuning(next);
-    publishParallaxTuning(next, "settings");
-  };
-
-  const resetSceneTuning = () => {
-    const next = { ...DEFAULT_PARALLAX_TUNING };
-    sceneTuningRef.current = next;
-    setSceneTuning(next);
-    publishParallaxTuning(next, "settings");
-    onMessage("已恢复 3D 墨景默认参数");
+  const resetAppearance = () => {
+    reset();
+    setMode("system");
+    onMessage("外观已恢复默认设置");
   };
 
   return (
-    <section className="settings-section appearance-settings">
-      <div className="settings-title">
-        <div className="settings-icon teal">
-          <Palette size={20} />
-        </div>
+    <section className="settings-section appearance-settings-v2" aria-labelledby="appearance-v2-title">
+      <header className="appearance-v2-header">
+        <div className="appearance-v2-heading-icon" aria-hidden="true"><Palette size={20} /></div>
         <div>
-          <h2>外观</h2>
-          <p>为 THEIA 设定干净、有层次的本地工作空间。</p>
+          <span className="appearance-v2-kicker">APPEARANCE</span>
+          <h2 id="appearance-v2-title">外观</h2>
+          <p>只保留稳定、常用的显示选项，修改会立即应用并自动保存在本机。</p>
         </div>
-      </div>
+      </header>
 
-      <div className="appearance-subsection-heading">
-        <span>INTERFACE THEME</span>
-        <strong>基础主题</strong>
-        <small>只改变工作区的基础明暗风格，不会改变背景图片。</small>
-      </div>
-      <div className="appearance-preset-grid" role="list" aria-label="界面主题">
-        {PRESETS.map((preset) => (
-          <button
-            type="button"
-            role="listitem"
-            key={preset.id}
-            className={[
-              "appearance-preset",
-              "appearance-preset-" + preset.id,
-              preferences.preset === preset.id ? "active" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            onClick={() => applyPreset(preset)}
-            disabled={duotoneActive}
-            aria-disabled={duotoneActive}
-            aria-pressed={preferences.preset === preset.id}
-          >
-            <span className="appearance-preset-swatch" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-            <strong>{preset.label}</strong>
-            <small>{preset.detail}</small>
-          </button>
-        ))}
-      </div>
-      {duotoneActive && (
-        <p className="appearance-theme-disabled-note">
-          双色映射开启时，基础主题样式由双色映射接管，此设置暂不可用。
-        </p>
-      )}
-
-      <section className="appearance-visual-presets" aria-labelledby="visual-presets-title">
-        <div className="appearance-visual-presets-heading">
-          <div>
-            <span>APPEARANCE PRESETS</span>
-            <strong id="visual-presets-title">一体化外观</strong>
-          </div>
-          <Button
-            type="button"
-            className="appearance-save-preset-trigger"
-            variant="outline"
-            size="sm"
-            disabled={preferences.customVisualPresets.length >= 16}
-            onClick={() => {
-              setSavePresetOpen((open) => !open);
-              setSavePresetError("");
-            }}
-            aria-expanded={savePresetOpen}
-          >
-            <Plus size={15} />
-            保存当前为预设
-          </Button>
-          <small>双色映射、界面色板与背景效果同步调整；背景来源保持不变。</small>
-        </div>
-        {savePresetOpen && (
-          <form
-            className="appearance-save-preset-form"
-            onSubmit={saveCurrentVisualPreset}
-          >
-            <label>
-              <span>
-                <strong>新预设名称</strong>
-                <small>保存当前双色映射、背景效果与基础主题。</small>
-              </span>
-              <input
-                autoFocus
-                maxLength={36}
-                value={customPresetName}
-                onChange={(event) => {
-                  setCustomPresetName(event.target.value);
-                  if (savePresetError) setSavePresetError("");
-                }}
-                placeholder="例如：夜航蓝金"
-                aria-describedby={
-                  savePresetError ? "appearance-save-preset-error" : undefined
-                }
-              />
-            </label>
-            <div className="appearance-save-preset-actions">
-              <Button type="submit" size="sm">
-                保存预设
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSavePresetOpen(false);
-                  setSavePresetError("");
-                }}
-              >
-                取消
-              </Button>
-            </div>
-            {savePresetError && (
-              <p id="appearance-save-preset-error" role="alert">
-                {savePresetError}
-              </p>
-            )}
-          </form>
-        )}
-        {visualPresetGroups.map((group) => (
-          <div className="appearance-visual-preset-group" key={group.label}>
-            <div className="appearance-visual-preset-group-heading">
-              <strong>{group.label}</strong>
-              <span>{group.detail}</span>
-            </div>
-            <div className="appearance-visual-preset-grid" role="list">
-              {group.presets.map((preset) => {
-                const active = matchesVisualPreset(preset, preferences);
-                return (
-                  <button
-                    type="button"
-                    role="listitem"
-                    key={preset.id}
-                    className={[
-                      "appearance-visual-preset",
-                      active ? "active" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={() => applyVisualPreset(preset)}
-                    aria-pressed={active}
-                  >
-                    <span
-                      className={[
-                        "appearance-visual-preset-swatch",
-                        preset.previewImage ? "has-preview-image" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      aria-hidden="true"
-                      style={
-                        {
-                          "--visual-preset-shadow": preset.gradientMap.shadow,
-                          "--visual-preset-highlight": preset.gradientMap.highlight,
-                          "--visual-preset-shadow-stop": `${preset.gradientMap.shadowPosition}%`,
-                          "--visual-preset-highlight-stop": `${preset.gradientMap.highlightPosition}%`,
-                          ...(preset.previewImage
-                            ? {
-                                backgroundImage: `url("${preset.previewImage}")`,
-                              }
-                            : {}),
-                        } as CSSProperties
-                      }
-                    >
-                      <i />
-                      <i />
-                    </span>
-                    <span className="appearance-visual-preset-copy">
-                      <strong>{preset.label}</strong>
-                      <small>{preset.detail}</small>
-                    </span>
-                    <span className="appearance-visual-preset-meta">
-                      <i style={{ backgroundColor: preset.gradientMap.shadow }} />
-                      <i style={{ backgroundColor: preset.gradientMap.highlight }} />
-                      <output>{preset.backgroundTransparency}% 透光</output>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {group.custom && (
-              <div className="appearance-custom-preset-actions">
-                {group.presets.map((preset) => (
-                  <button
-                    type="button"
-                    key={preset.id}
-                    onClick={() => removeCustomVisualPreset(preset)}
-                    title={`删除“${preset.label}”`}
-                  >
-                    <Trash2 size={13} />
-                    删除 {preset.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </section>
-
-      <div className="appearance-background-section">
-        <div
-          className={[
-            "appearance-background-preview",
-            hasBackground ? "has-image" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          aria-label="客户端背景预览"
-        >
-          <div>
-            <span>THEIA</span>
-            <strong>客户端背景</strong>
-            <small>
-              {hasBackground
-                ? preferences.backgroundName || "已选择图片"
-                : "默认保持纯净工作界面"}
-            </small>
-          </div>
-          <i aria-hidden="true" />
-        </div>
-        <div className="appearance-background-actions">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void chooseBackground()}
-          >
-            <ImagePlus size={15} />
-            选择图片
-          </Button>
-          {hasBackground && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setGradientOpen((open) => !open);
-                setMotionOpen(false);
-              }}
-              aria-expanded={gradientOpen}
-            >
-              <Blend size={15} />
-              双色映射
-            </Button>
-          )}
-          {hasBackground && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setMotionOpen((open) => !open);
-                setGradientOpen(false);
-              }}
-              aria-expanded={motionOpen}
-            >
-              <SlidersHorizontal size={15} />
-              背景效果
-            </Button>
-          )}
-          {hasBackground && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={clearBackground}
-            >
-              <Trash2 size={15} />
-              移除图片
-            </Button>
-          )}
-        </div>
-        <section
-          hidden
-          className={`appearance-parallax-tuning${sceneEnabled ? " is-active" : ""}`}
-          aria-labelledby="appearance-parallax-tuning-title"
-        >
-          <div className="appearance-parallax-tuning-heading">
+      <div className="appearance-v2-layout">
+        <section className="appearance-v2-card appearance-v2-mode-card" aria-labelledby="appearance-mode-title">
+          <div className="appearance-v2-card-heading">
             <div>
-              <span>PARALLAX 3D ENGINE</span>
-              <strong id="appearance-parallax-tuning-title">3D 墨景参数</strong>
-              <small>
-                {sceneEnabled
-                  ? "拖动后立即预览，场景与设置页共享同一组参数。"
-                  : "选择“一体化外观”中的 3D 墨景后启用；参数会提前保留。"}
-              </small>
+              <h3 id="appearance-mode-title">显示模式</h3>
+              <p>选择应用的明暗显示方式</p>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={resetSceneTuning}
-              title="恢复 3D 墨景默认参数"
-            >
-              <RotateCcw size={14} />
-              恢复默认
-            </Button>
+            <span className="appearance-v2-current-badge"><ActiveModeIcon size={14} />{activeMode.label}</span>
           </div>
-          <div className="appearance-parallax-tuning-groups">
-            {PARALLAX_TUNING_GROUPS.map((group) => (
-              <details
-                className="appearance-parallax-tuning-group"
-                key={group.id}
-                open={group.id === "motion"}
+          <div className="appearance-v2-mode-grid" role="radiogroup" aria-label="显示模式">
+            {MODE_OPTIONS.map(({ id, label, description, icon: Icon }) => (
+              <button
+                type="button"
+                key={id}
+                className={`appearance-v2-mode-option${mode === id ? " active" : ""}`}
+                role="radio"
+                aria-checked={mode === id}
+                onClick={() => setMode(id)}
               >
-                <summary>
-                  <span>
-                    <strong>{group.label}</strong>
-                    <small>{group.detail}</small>
-                  </span>
-                  <ChevronDown aria-hidden="true" />
-                </summary>
-                <div className="appearance-parallax-tuning-content">
-                  {group.toggles?.map((toggle) => (
-                    <div
-                      className="appearance-parallax-tuning-toggle"
-                      data-disabled={!sceneEnabled}
-                      key={toggle.key}
-                    >
-                      <span>
-                        <strong>{toggle.label}</strong>
-                        <small>{toggle.detail}</small>
-                      </span>
-                      <Switch
-                        checked={sceneTuning[toggle.key]}
-                        disabled={!sceneEnabled}
-                        onCheckedChange={(checked) =>
-                          updateSceneTuning(toggle.key, checked)
-                        }
-                      />
-                    </div>
-                  ))}
-                  {group.sliders.map((slider) => {
-                    const value = sceneTuning[slider.key];
-                    return (
-                      <label
-                        className="appearance-parallax-tuning-slider"
-                        data-disabled={!sceneEnabled}
-                        key={slider.key}
-                      >
-                        <span>
-                          <strong>{slider.label}</strong>
-                          {slider.hint && <small>{slider.hint}</small>}
-                        </span>
-                        <input
-                          type="range"
-                          min={slider.min}
-                          max={slider.max}
-                          step={slider.step}
-                          value={value}
-                          disabled={!sceneEnabled}
-                          onChange={(event) =>
-                            updateSceneTuning(
-                              slider.key,
-                              Number(event.target.value),
-                            )
-                          }
-                        />
-                        <output>{Number(value).toFixed(slider.digits)}</output>
-                      </label>
-                    );
-                  })}
-                </div>
-              </details>
+                <span className="appearance-v2-option-icon"><Icon size={18} aria-hidden="true" /></span>
+                <span className="appearance-v2-option-copy"><strong>{label}</strong><small>{description}</small></span>
+                {mode === id && <Check className="appearance-v2-check" size={17} aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+          <p className="appearance-v2-help">{mode === "system" ? `当前跟随系统，正在使用${resolvedMode === "dark" ? "深色" : "浅色"}模式。` : "当前模式会立即应用到全部页面。"}</p>
+        </section>
+
+        <section className="appearance-v2-card appearance-v2-background-card" aria-labelledby="appearance-background-title">
+          <div className="appearance-v2-card-heading">
+            <div>
+              <h3 id="appearance-background-title">背景色</h3>
+              <p>更换页面底色，卡片和文字会自动保持对比度</p>
+            </div>
+            <span className="appearance-v2-custom-note">5 个预设</span>
+          </div>
+          <div className="appearance-v2-background-grid" role="radiogroup" aria-label="背景色">
+            {BACKGROUND_OPTIONS.map((background) => (
+              <button
+                type="button"
+                key={background.id}
+                className={`appearance-v2-background-option${preferences.background === background.id ? " active" : ""}`}
+                role="radio"
+                aria-checked={preferences.background === background.id}
+                onClick={() => {
+                  setBackground(background.id);
+                  onMessage(`已切换背景色：${background.label}`);
+                }}
+              >
+                <span className={`appearance-v2-background-swatch ${background.id}`} aria-hidden="true">
+                  <i style={{ background: background.light }} />
+                  <i style={{ background: background.dark }} />
+                </span>
+                <span className="appearance-v2-option-copy"><strong>{background.label}</strong></span>
+                {preferences.background === background.id && <Check className="appearance-v2-check" size={17} aria-hidden="true" />}
+              </button>
             ))}
           </div>
         </section>
-        {hasBackground && gradientOpen && (
-          <div
-            className="appearance-gradient-map-popover"
-            role="dialog"
-            aria-label="双色渐变映射设置"
-          >
-            <div className="appearance-motion-heading">
-              <div>
-                <span>DUOTONE ENGINE</span>
-                <strong>双色渐变映射</strong>
-              </div>
+
+        <section className="appearance-v2-card appearance-v2-accent-card" aria-labelledby="appearance-accent-title">
+          <div className="appearance-v2-card-heading">
+            <div>
+              <h3 id="appearance-accent-title">强调色</h3>
+              <p>应用于按钮、选中状态和重点信息</p>
+            </div>
+            <span className="appearance-v2-custom-note">6 个预设</span>
+          </div>
+          <div className="appearance-v2-accent-grid" role="radiogroup" aria-label="强调色">
+            {ACCENT_OPTIONS.map((accent) => (
               <button
                 type="button"
-                className="appearance-motion-close"
-                onClick={() => setGradientOpen(false)}
-                aria-label="关闭双色渐变映射设置"
+                key={accent.id}
+                className={`appearance-v2-accent-option${selectedAccent === accent.id ? " active" : ""}`}
+                role="radio"
+                aria-label={`强调色：${accent.label}`}
+                title={accent.label}
+                aria-checked={selectedAccent === accent.id}
+                onClick={() => applyAccent(accent)}
               >
-                <X size={15} />
+                <span className="appearance-v2-accent-swatch" style={{ background: `linear-gradient(135deg, ${accent.shadow}, ${accent.highlight})` }} aria-hidden="true" />
+                {selectedAccent === accent.id && <Check size={15} aria-hidden="true" />}
               </button>
-            </div>
-            <div
-              className="gradient-map-ramp"
-              onPointerDown={handleGradientRampPointerDown}
-              onPointerMove={handleGradientRampPointerMove}
-              onPointerUp={handleGradientRampPointerEnd}
-              onPointerCancel={handleGradientRampPointerEnd}
-              style={{
-                "--gradient-map-shadow-stop": `${preferences.gradientMap.shadowPosition}%`,
-                "--gradient-map-highlight-stop": `${preferences.gradientMap.highlightPosition}%`,
-                background: `linear-gradient(90deg, ${preferences.gradientMap.shadow} 0%, ${preferences.gradientMap.shadow} ${preferences.gradientMap.shadowPosition}%, ${preferences.gradientMap.highlight} ${preferences.gradientMap.highlightPosition}%, ${preferences.gradientMap.highlight} 100%)`,
-              } as CSSProperties}
-            >
-              <input
-                className="gradient-map-stop-input gradient-map-stop-shadow"
-                type="range"
-                min="0"
-                max={Math.max(0, preferences.gradientMap.highlightPosition - 4)}
-                value={preferences.gradientMap.shadowPosition}
-                onChange={(event) =>
-                  updateGradientStop(
-                    "shadowPosition",
-                    Number(event.target.value),
-                  )
-                }
-                style={
-                  {
-                    "--gradient-map-stop-color": preferences.gradientMap.shadow,
-                  } as CSSProperties
-                }
-                aria-label="调整暗部映射起点"
-              />
-              <input
-                className="gradient-map-stop-input gradient-map-stop-highlight"
-                type="range"
-                min={preferences.gradientMap.shadowPosition + 4}
-                max="100"
-                value={preferences.gradientMap.highlightPosition}
-                onChange={(event) =>
-                  updateGradientStop(
-                    "highlightPosition",
-                    Number(event.target.value),
-                  )
-                }
-                style={
-                  {
-                    "--gradient-map-stop-color": preferences.gradientMap.highlight,
-                  } as CSSProperties
-                }
-                aria-label="调整高光映射终点"
-              />
-            </div>
-            <div className="gradient-map-stop-values" aria-live="polite">
-              <span>
-                <i style={{ backgroundColor: preferences.gradientMap.shadow }} />
-                暗部起点 <output>{preferences.gradientMap.shadowPosition}%</output>
-              </span>
-              <span>
-                <i style={{ backgroundColor: preferences.gradientMap.highlight }} />
-                高光终点 <output>{preferences.gradientMap.highlightPosition}%</output>
-              </span>
-            </div>
-            <div className="gradient-map-color-grid">
-              <label className="gradient-map-color-control">
-                <span>
-                  <strong>暗部颜色</strong>
-                  <small>控制线稿、阴影与图案深处</small>
-                </span>
-                <span>
-                  <input
-                    type="color"
-                    value={preferences.gradientMap.shadow}
-                    onChange={(event) =>
-                      updateGradientColor("shadow", event.target.value)
-                    }
-                    aria-label="选择暗部颜色"
-                  />
-                  <output>{preferences.gradientMap.shadow.toUpperCase()}</output>
-                </span>
-              </label>
-              <label className="gradient-map-color-control">
-                <span>
-                  <strong>亮部颜色</strong>
-                  <small>控制纸张、高光与背景留白</small>
-                </span>
-                <span>
-                  <input
-                    type="color"
-                    value={preferences.gradientMap.highlight}
-                    onChange={(event) =>
-                      updateGradientColor("highlight", event.target.value)
-                    }
-                    aria-label="选择亮部颜色"
-                  />
-                  <output>{preferences.gradientMap.highlight.toUpperCase()}</output>
-                </span>
-              </label>
-            </div>
-            <button
-              type="button"
-              className="gradient-map-swap-button"
-              onClick={swapGradientColors}
-            >
-              <ArrowLeftRight size={15} />
-              对调亮暗部颜色
-            </button>
-            <div className="gradient-map-palette-preview">
-              <span>界面色板</span>
-              <i
-                style={{
-                  backgroundColor: gradientPalette.variables["--background"],
-                }}
-                title="应用背景"
-              />
-              <i
-                style={{ backgroundColor: gradientPalette.variables["--card"] }}
-                title="信息面板"
-              />
-              <i
-                style={{
-                  backgroundColor: gradientPalette.variables["--primary"],
-                }}
-                title="强调色"
-              />
-              <i
-                style={{
-                  backgroundColor: gradientPalette.variables["--foreground"],
-                }}
-                title="文字颜色"
-              />
-              <small>{preferences.backgroundPalette ? "从当前背景的主色与辅助色提取，并保持表面克制" : "等待背景图片取色完成"}</small>
-            </div>
-            <div className="appearance-motion-toggle">
-              <span>
-                <strong>应用到背景</strong>
-                <small>保留图像纹理，只替换明暗两端的颜色</small>
-              </span>
-              <Switch
-                checked={preferences.gradientMap.enabled}
-                onCheckedChange={(enabled) => setGradientMap({ enabled })}
-              />
-            </div>
-            <div className="appearance-motion-toggle">
-              <span>
-                <strong>同步界面色板</strong>
-                <small>从背景照片采样主色与辅助色，生成克制且可读的界面色板</small>
-              </span>
-              <Switch
-                checked={preferences.gradientMap.syncPalette}
-                onCheckedChange={(syncPalette) =>
-                  setGradientMap({ syncPalette })
-                }
-              />
-            </div>
-            <div className="gradient-map-mode-note">
-              <Blend size={14} />
-              <span>
-                当前按{gradientPalette.mode === "light" ? "浅色" : "深色"}
-                模式生成完整色板：结构保持中性，强调色来自当前背景。
-              </span>
-            </div>
-          </div>
-        )}
-        {hasBackground && motionOpen && (
-          <div
-            className="appearance-motion-popover"
-            role="dialog"
-            aria-label="背景效果设置"
-          >
-            <div className="appearance-motion-heading">
-              <div>
-                <span>BACKGROUND LAYERS</span>
-                <strong>背景效果</strong>
-              </div>
-              <button
-                type="button"
-                className="appearance-motion-close"
-                onClick={() => setMotionOpen(false)}
-                aria-label="关闭背景动效设置"
-              >
-                <X size={15} />
-              </button>
-            </div>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>原图模糊</strong>
-                <small>0px 保持原图清晰；数值越高越柔和</small>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="64"
-                step="1"
-                value={preferences.backgroundBlur}
-                onChange={(event) =>
-                  setBackgroundBlur(Number(event.target.value))
-                }
-              />
-              <output>{preferences.backgroundBlur}px</output>
-            </label>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>面板透明度</strong>
-                <small>0% 为实心面板，100% 完全透出背景</small>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={preferences.backgroundTransparency}
-                onChange={(event) =>
-                  setBackgroundTransparency(Number(event.target.value))
-                }
-              />
-              <output>{preferences.backgroundTransparency}%</output>
-            </label>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>图像强度</strong>
-                <small>控制背景原图的可见程度，0% 为完全隐藏</small>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={preferences.backgroundImage.opacity}
-                onChange={(event) =>
-                  setBackgroundImage({ opacity: Number(event.target.value) })
-                }
-              />
-              <output>{preferences.backgroundImage.opacity}%</output>
-            </label>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>图像亮度</strong>
-                <small>调整背景明暗，范围可低于或高于原图</small>
-              </span>
-              <input
-                type="range"
-                min="20"
-                max="220"
-                step="1"
-                value={preferences.backgroundImage.brightness}
-                onChange={(event) =>
-                  setBackgroundImage({ brightness: Number(event.target.value) })
-                }
-              />
-              <output>{preferences.backgroundImage.brightness}%</output>
-            </label>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>图像对比度</strong>
-                <small>控制背景纹理的黑白层次和冲击力</small>
-              </span>
-              <input
-                type="range"
-                min="20"
-                max="240"
-                step="1"
-                value={preferences.backgroundImage.contrast}
-                onChange={(event) =>
-                  setBackgroundImage({ contrast: Number(event.target.value) })
-                }
-              />
-              <output>{preferences.backgroundImage.contrast}%</output>
-            </label>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>图像饱和度</strong>
-                <small>从纯灰到高饱和，单独控制原图色彩</small>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="260"
-                step="1"
-                value={preferences.backgroundImage.saturation}
-                onChange={(event) =>
-                  setBackgroundImage({ saturation: Number(event.target.value) })
-                }
-              />
-              <output>{preferences.backgroundImage.saturation}%</output>
-            </label>
-            <div className="appearance-motion-toggle">
-              <span>
-                <strong>图片纹理</strong>
-                <small>用当前图片生成极淡的拓印质感</small>
-              </span>
-              <Switch
-                checked={preferences.backgroundTexture.enabled}
-                onCheckedChange={(enabled) =>
-                  setBackgroundTexture({ enabled })
-                }
-              />
-            </div>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>纹理强度</strong>
-                <small>控制拓印质感的醒目程度</small>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                step="0.1"
-                value={preferences.backgroundTexture.opacity}
-                disabled={!preferences.backgroundTexture.enabled}
-                onChange={(event) =>
-                  setBackgroundTexture({ opacity: Number(event.target.value) })
-                }
-              />
-              <output>
-                {preferences.backgroundTexture.opacity.toFixed(1)}%
-              </output>
-            </label>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>纹理铺设</strong>
-                <small>控制纹理覆盖的页面高度</small>
-              </span>
-              <input
-                type="range"
-                min="100"
-                max="500"
-                step="10"
-                value={preferences.backgroundTexture.height}
-                disabled={!preferences.backgroundTexture.enabled}
-                onChange={(event) =>
-                  setBackgroundTexture({ height: Number(event.target.value) })
-                }
-              />
-              <output>
-                {(preferences.backgroundTexture.height / 100).toFixed(1)} 屏
-              </output>
-            </label>
-            <div className="appearance-motion-toggle">
-              <span>
-                <strong>鼠标视差</strong>
-                <small>背景随指针轻微移动</small>
-              </span>
-              <Switch
-                checked={preferences.backgroundMotion.enabled}
-                onCheckedChange={(enabled) =>
-                  setBackgroundMotion({ enabled })
-                }
-              />
-            </div>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>视差幅度</strong>
-                <small>控制随指针移动的距离</small>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="120"
-                step="1"
-                value={preferences.backgroundMotion.intensity}
-                disabled={!preferences.backgroundMotion.enabled}
-                onChange={(event) =>
-                  setBackgroundMotion({ intensity: Number(event.target.value) })
-                }
-              />
-              <output>{preferences.backgroundMotion.intensity}px</output>
-            </label>
-            <label className="appearance-motion-slider">
-              <span>
-                <strong>背景缩放</strong>
-                <small>放大取景，避免移动时露出边缘</small>
-              </span>
-              <input
-                type="range"
-                min="100"
-                max="180"
-                step="1"
-                value={preferences.backgroundMotion.scale}
-                disabled={!preferences.backgroundMotion.enabled}
-                onChange={(event) =>
-                  setBackgroundMotion({ scale: Number(event.target.value) })
-                }
-              />
-              <output>{preferences.backgroundMotion.scale}%</output>
-            </label>
-            <div className="appearance-motion-note">
-              <Sparkles size={14} />
-              <span>纹理始终来自当前选中的背景图片。</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="setting-row appearance-theme-row">
-        <span>
-          <strong>主题模式</strong>
-          <small>
-            {mode === "system"
-              ? "跟随系统，当前为" +
-                (resolvedMode === "dark" ? "深色" : "浅色")
-              : "立即应用到全部工作区"}
-          </small>
-        </span>
-        <Select
-          value={mode}
-          onValueChange={(value) => setMode(value as AppearanceMode)}
-        >
-          <SelectTrigger className="appearance-theme-select" size="sm">
-            <SelectValue placeholder="选择主题" />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            {MODE_OPTIONS.map(({ id, label, icon: Icon }) => (
-              <SelectItem key={id} value={id}>
-                <Icon aria-hidden="true" />
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {isDesktop && (
-        <div className="setting-row appearance-zoom-row">
-          <span>
-            <strong>界面缩放</strong>
-            <small>当前 {zoom}%</small>
-          </span>
-          <div className="appearance-zoom-group" role="group" aria-label="界面缩放">
-            {ZOOM_PRESETS.map((percent) => (
-              <Button
-                key={percent}
-                className="appearance-zoom-button"
-                variant={zoom === percent ? "default" : "outline"}
-                size="xs"
-                onClick={() => setZoom(percent)}
-              >
-                {percent}%
-              </Button>
             ))}
           </div>
+        </section>
+      </div>
+
+      <footer className="appearance-v2-footer">
+        <div>
+          <strong><ActiveModeIcon size={15} />当前配置</strong>
+          <span>{BACKGROUND_OPTIONS.find((item) => item.id === preferences.background)?.label} · {activeMode.label} · {selectedAccent === "custom" ? "自定义强调色" : ACCENT_OPTIONS.find((item) => item.id === selectedAccent)?.label}</span>
         </div>
-      )}
+        <button type="button" className="appearance-v2-reset" onClick={resetAppearance}><RotateCcw size={15} />恢复默认</button>
+      </footer>
     </section>
   );
 }

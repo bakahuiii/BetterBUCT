@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import nodeCrypto from 'node:crypto';
+import { toBase64Url } from '../../core/base64url.mjs';
 
 // Load the polyfill module (it imports jsrsasign + buffer)
 const polyfill = await import('../src/mobile/polyfills/node-crypto.mjs');
@@ -10,6 +11,12 @@ const polyfill = await import('../src/mobile/polyfills/node-crypto.mjs');
 // Generate an RSA key pair with Node
 const { publicKey, privateKey } = nodeCrypto.generateKeyPairSync('rsa', {
   modulusLength: 2048,
+});
+
+test('toBase64Url uses standard base64 conversion without padding', () => {
+  assert.equal(toBase64Url(Buffer.from([251, 255, 239, 250])), '-__v-g');
+  assert.equal(toBase64Url('学生'), '5a2m55Sf');
+  assert.equal(toBase64Url(Buffer.from([0, 1, 2])), 'AAEC');
 });
 
 test('publicEncrypt produces Node-decryptable PKCS1 v1.5 ciphertext', () => {

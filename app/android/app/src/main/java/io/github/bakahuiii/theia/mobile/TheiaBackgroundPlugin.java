@@ -79,7 +79,7 @@ public class TheiaBackgroundPlugin extends Plugin {
             NotificationManager manager = getContext().getSystemService(NotificationManager.class);
             NotificationChannel channel = new NotificationChannel(
                 TheiaSyncWorker.NOTIFICATION_CHANNEL_ID,
-                "THEIA 同步提醒",
+                "BetterBUCT 同步提醒",
                 NotificationManager.IMPORTANCE_DEFAULT
             );
             channel.setDescription("校园数据更新的周期提醒");

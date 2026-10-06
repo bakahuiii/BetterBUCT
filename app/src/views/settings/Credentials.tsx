@@ -16,6 +16,13 @@ export function CredentialForm({ status, onStatus, onSaved, onMessage, className
   const [username, setUsername] = useState(status.username || "");
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
+  const isMobileRuntime = Boolean((window as Window & { __THEIA_MOBILE__?: unknown }).__THEIA_MOBILE__);
+  const isNativeMobileRuntime = isMobileRuntime && Boolean(window.Capacitor?.isNativePlatform?.());
+  const securityCopy = isNativeMobileRuntime
+    ? "凭据由 Android Keystore 加密保存，不会进入导出、本地 API 或日志。"
+    : isMobileRuntime
+      ? "浏览器预览仅保存在当前浏览器本地，不会进入导出、本地 API 或日志。"
+      : "凭据由当前 Windows 账户加密保存，不会进入导出、本地 API 或日志。";
 
   useEffect(() => setUsername(status.username || ""), [status.username]);
 
@@ -26,9 +33,9 @@ export function CredentialForm({ status, onStatus, onSaved, onMessage, className
       const next = await bridge.saveCredentials({ username, password });
       onStatus(next);
       setPassword("");
-      onSaved?.();
-      onMessage("凭据已由当前 Windows 账户加密保存，正在连接学校统一身份认证。");
+      onMessage(`${isNativeMobileRuntime ? "凭据已由 Android Keystore 加密保存" : isMobileRuntime ? "凭据已保存在当前浏览器预览中" : "凭据已由当前 Windows 账户加密保存"}，正在连接学校统一身份认证并刷新校园数据。`);
       await bridge.login();
+      onSaved?.();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -56,7 +63,7 @@ export function CredentialForm({ status, onStatus, onSaved, onMessage, className
         disabled={saving}
       />
       {status.error && <p className="credential-error"><AlertCircle size={15} /> {status.error}</p>}
-      <div className="credential-security"><ShieldCheck size={16} /><span>凭据由当前 Windows 账户加密保存，不会进入导出、本地 API 或日志。</span></div>
+      <div className="credential-security"><ShieldCheck size={16} /><span>{securityCopy}</span></div>
       <button className="primary-button" type="submit" disabled={saving || !status.encryptionAvailable || !username.trim() || !password}>
         <Save size={16} /> {saving ? "正在保存" : status.saved ? "更新并登录" : "保存并登录"}
       </button>

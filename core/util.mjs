@@ -166,10 +166,31 @@ export function toQueryString(values) {
 
 export function htmlLooksLikeLogin(html, finalUrl = '') {
   const urlText = String(finalUrl).toLowerCase()
-  const lower = String(html).toLowerCase()
+  const trimmed = String(html ?? '').trim()
+  // THEOL's mobile login endpoint returns JSON after redirecting to
+  // `/mobile/loginSuccess.do`. Do not apply an HTML login-page heuristic to a
+  // valid JSON response merely because its URL or field names contain `login`.
+  if (/^[\[{]/u.test(trimmed)) {
+    try {
+      JSON.parse(trimmed)
+      return false
+    } catch {
+      // A malformed response can still be an HTML/error page; keep the
+      // existing marker checks below as a conservative fallback.
+    }
+  }
+  const lower = trimmed.toLowerCase()
   const hasPasswordField = /<input\b[^>]*type\s*=\s*["']?password\b/i.test(lower)
   const hasLoginMarker = /password|login|sso|cas|统一身份认证|请输入密码|密码登录/i.test(lower)
-  return (urlText.includes('experimental-auth-endpoint') || urlText.includes('/login') || hasPasswordField) && hasLoginMarker
+  const hasExpiredSessionMarker = /没有权限访问本页面|登录时间超时|登录已超时|会话已过期|会话超时/u.test(lower)
+    || (/请重新登录/u.test(lower) && /权限|超时|过期/u.test(lower))
+  return hasExpiredSessionMarker
+    || ((urlText.includes('experimental-auth-endpoint') || urlText.includes('/login') || hasPasswordField) && hasLoginMarker)
+}
+
+export function htmlLooksLikeRateLimit(html) {
+  const lower = String(html || '').toLowerCase()
+  return /访问(?:过于|太过|过度)?频繁|请求(?:过于|太过|过度)?频繁|操作(?:过于|太过|过度)?频繁|请不要频繁|稍后再试/u.test(lower)
 }
 
 const SENSITIVE_DIAGNOSTIC_KEYS = [

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <!-- THEOL's official mobile task endpoints are legacy HTTP only. Keep the
+         exception host-scoped instead of enabling cleartext for the whole app. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">course.buct.edu.cn</domain>
+    </domain-config>
+</network-security-config>

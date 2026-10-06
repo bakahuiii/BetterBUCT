@@ -32,10 +32,10 @@ const SOURCE_LABELS: Record<string, string> = {
 const ERROR_EXPLANATIONS: Record<string, string> = {
   auth_required: "最近一次读取要求重新登录，因此没有用本次响应替换已保存数据。",
   source_sync_failed: "最近一次同步没有获得可确认的来源响应，已保留之前的本地数据。",
-  partial_source_errors: "来源返回了部分数据，同时报告了读取错误；THEIA 只合并可确认的部分。",
+  partial_source_errors: "来源返回了部分数据，同时报告了读取错误；BetterBUCT 只合并可确认的部分。",
   partial_assignment_scan: "部分课程工作区未能完成扫描，作业列表可能仍含上一次保存的条目。",
-  unconfirmed_empty_result: "本次返回为空，但来源没有明确确认“确无记录”；为避免误删，THEIA 保留了之前的数据。",
-  schedule_payload_unpositioned: "来源给出了课程行，但没有有效的星期或节次定位；THEIA 保留了之前可排版的课表。",
+  unconfirmed_empty_result: "本次返回为空，但来源没有明确确认“确无记录”；为避免误删，BetterBUCT 保留了之前的数据。",
+  schedule_payload_unpositioned: "来源给出了课程行，但没有有效的星期或节次定位；BetterBUCT 保留了之前可排版的课表。",
   multiple_source_errors: "多个来源在本轮同步中返回了不同错误，当前数据由仍可确认的来源组成。",
   multiple_dependency_errors: "组成该汇总数据的多个子领域存在异常，请分别查看各子领域诊断。",
 };

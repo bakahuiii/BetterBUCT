@@ -1,3 +1,7 @@
+import { initCrashReporter } from './crash-reporter.ts'
+import { APP_VERSION_LABEL } from './app-identity.mjs'
+initCrashReporter(APP_VERSION_LABEL)
+
 // Installs the mobile bridge as window.theia synchronously at module
 // evaluation time, before src/main.tsx (which reads window.theia in bridge.ts)
 // is evaluated. This is the core platformAdapter for the mobile WebView.
@@ -48,7 +52,7 @@ try {
 
   function showError(msg, source, line, col, error) {
     const text = [
-      'THEIA 遇到错误无法启动',
+      'BetterBUCT 遇到错误无法启动',
       '',
       msg || '',
       source ? 'at: ' + source + ':' + line + ':' + col : '',
@@ -66,7 +70,15 @@ try {
   });
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
-    showError(reason?.message || String(reason), null, null, null, reason instanceof Error ? reason : null);
+    const message = reason?.message || String(reason);
+    // Cancelling the native CAS dialog is a normal user action. Never turn it
+    // into the fatal bootstrap overlay; the React shell and cached data remain
+    // usable and the auth banner can offer another attempt.
+    if (/(?:统一身份认证|登录|请求)已取消|用户取消|cancell?ed|aborted/iu.test(message)) {
+      event.preventDefault?.();
+      return;
+    }
+    showError(message, null, null, null, reason instanceof Error ? reason : null);
   });
 } catch (e) {
   // Error capture itself must never crash.

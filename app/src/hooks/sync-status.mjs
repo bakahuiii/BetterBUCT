@@ -32,6 +32,26 @@ function failureSignature(error) {
   return sanitizeSyncFailure(error).toLocaleLowerCase();
 }
 
+export function isCampusAuthFailure(error) {
+  const text = error instanceof Error ? `${error.message} ${error.code || ""}` : String(error ?? "");
+  if (/教务 API/iu.test(text) && !/统一身份认证|校园会话|THEOL/iu.test(text)) return false;
+  return /校园会话已失效|会话已失效|需要重新(?:完成)?统一身份认证|请在设置中重新登录|请先在设置中保存统一身份认证账号和密码|未找到可恢复的校园账号|统一身份认证已取消|auth[_-]?required|session.*expired|登录未完成/iu.test(text);
+}
+
+export function isRateLimitFailure(error) {
+  const text = error instanceof Error ? `${error.message} ${error.code || ""}` : String(error ?? "");
+  return /(?:访问|请求|操作)(?:过于|太过|过度)?频繁|请不要频繁|稍后再试|rate[-_ ]?limit|\b429\b|eratlimit/i.test(text);
+}
+
+const SYNC_RENDERER_START_GRACE_MS = 5_000;
+
+export function syncStartedDuringRenderer(sync, rendererStartedAt, graceMs = SYNC_RENDERER_START_GRACE_MS) {
+  const startedAt = Date.parse(sync?.lastStartedAt || "");
+  const sessionStartedAt = Number(rendererStartedAt);
+  if (!Number.isFinite(startedAt) || !Number.isFinite(sessionStartedAt)) return false;
+  return startedAt >= sessionStartedAt - Math.max(0, Number(graceMs) || 0);
+}
+
 export function createSyncFailureObserver({ report, recover = () => {} }) {
   let initialized = false;
   let pending = [];

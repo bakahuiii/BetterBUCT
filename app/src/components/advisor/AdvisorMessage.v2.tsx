@@ -85,7 +85,7 @@ export function AdvisorMessage({ message }: { message: AdvisorThreadMessage }) {
     <article className="advisor-v2-message is-assistant">
       <span className="advisor-v2-message-avatar is-assistant" aria-hidden="true"><Bot className="size-4" /></span>
       <div className="advisor-v2-message-body">
-        <span className="advisor-v2-speaker">THEIA Agent</span>
+        <span className="advisor-v2-speaker">BetterBUCT Agent</span>
         <AdvisorMarkdown source={visibleText} />
         <div className="advisor-v2-message-meta">
           <Clock3 className="size-3" aria-hidden="true" />

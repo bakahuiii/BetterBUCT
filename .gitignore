@@ -7,3 +7,8 @@ app/android/build/
 app/android/capacitor-cordova-android-plugins/
 *.log
 .DS_Store
+
+# 签名密钥（敏感信息，不可提交）
+app/android/keystore.properties
+*.keystore
+*.jks

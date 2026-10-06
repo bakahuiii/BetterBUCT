@@ -7,11 +7,13 @@ import type {
   ActivityLogEntry,
   AuthStatus,
   FitnessScoreResult,
+  GithubUpdateStatus,
   MotionVenueCatalog,
   MotionVenueStatus,
   TheiaBridge,
   CampusState,
   AdvisorOverview,
+  ApiStatus,
   UserDataDomainSummary,
   UserDataOverview,
   UserDataRecordsOptions,
@@ -123,6 +125,21 @@ function cacheDemoMotionStatus(result: MotionVenueStatus) {
   publishWebSnapshot();
 }
 
+function unsupportedUpdateStatus(): GithubUpdateStatus {
+  return {
+    supported: false,
+    state: "unsupported",
+    currentVersion: webState.appVersion || "web",
+    availableVersion: null,
+    releaseName: null,
+    releaseDate: null,
+    lastCheckedAt: null,
+    progress: null,
+    updateSizeBytes: null,
+    error: null,
+  };
+}
+
 const webBridge: TheiaBridge = {
   async getSnapshot() {
     return structuredClone(webState);
@@ -192,6 +209,21 @@ const webBridge: TheiaBridge = {
       providers: { theia: true },
     };
   },
+  async getUpdateStatus(): Promise<GithubUpdateStatus> {
+    return unsupportedUpdateStatus();
+  },
+  async checkForUpdates(): Promise<GithubUpdateStatus> {
+    return unsupportedUpdateStatus();
+  },
+  async downloadUpdate(): Promise<GithubUpdateStatus> {
+    return unsupportedUpdateStatus();
+  },
+  async skipUpdateVersion(): Promise<GithubUpdateStatus> {
+    return unsupportedUpdateStatus();
+  },
+  async installUpdate(): Promise<GithubUpdateStatus> {
+    return unsupportedUpdateStatus();
+  },
   async saveIrisSettings() { throw new Error("Iris 设置仅在桌面客户端中可用"); },
   async openIrisControlPanel() { throw new Error("Iris 控制面板仅在桌面客户端中可用"); },
   async saveIrisCredentials() { throw new Error("Iris 凭据仅在桌面客户端中可用"); },
@@ -202,6 +234,9 @@ const webBridge: TheiaBridge = {
   async getAuthStatus() {
     const connected = demo;
     return { jwglxt: { connected }, theol: { connected } };
+  },
+  onUpdateStatus() {
+    return () => undefined;
   },
   async getCredentialStatus() {
     return { saved: false, encryptionAvailable: false };
@@ -246,7 +281,7 @@ const webBridge: TheiaBridge = {
   async downloadMailboxAttachment() {
     throw new Error("校园邮箱仅在桌面客户端中可用");
   },
-  async login() {
+  async login(_options?: { silent?: boolean; interactive?: boolean }) {
     throw new Error("统一身份认证仅在桌面客户端中可用");
   },
   async logout() {
@@ -335,10 +370,22 @@ const webBridge: TheiaBridge = {
   async openAssignmentSource() {
     throw new Error("Assignment source pages are available only in the desktop client");
   },
+  async getAssignmentDetail() {
+    throw new Error("作业详情仅在安卓版或桌面同步数据中可用");
+  },
+  async downloadAssignmentAttachment() {
+    throw new Error("作业附件下载仅在安卓版或桌面同步数据中可用");
+  },
+  async openCourseMaterial() {
+    throw new Error("课程资料仅在桌面客户端中可用");
+  },
   async openSchedulePdf() {
     throw new Error(
       "Schedule PDF output is available only in the desktop client",
     );
+  },
+  async openScheduleDirectory() {
+    throw new Error("课表 PDF 文件夹仅在桌面客户端中可用");
   },
   async getCourseWorkQueue() {
     return { schema: "theia-course-work-queue/v1", enabled: false, updatedAt: new Date().toISOString(), jobs: [] };
@@ -425,7 +472,7 @@ const webBridge: TheiaBridge = {
     throw new Error("PDF 渲染仅在桌面客户端中可用");
   },
   async getApiStatus() {
-    return { baseUrl: "", host: "", port: 0, academicCalendarAssets: {}, academicPlanAssetBaseUrl: "" };
+    return { baseUrl: "", host: "", port: 0, apiEndpoints: [], mcp: undefined, academicCalendarAssets: {}, academicPlanAssetBaseUrl: "" } satisfies ApiStatus;
   },
   async getFitnessScore(): Promise<FitnessScoreResult> {
     throw new Error("体测成绩导入仅在桌面客户端中可用");
@@ -436,40 +483,6 @@ const webBridge: TheiaBridge = {
   },
   async installMcpClients() {
     throw new Error("MCP 配置仅在桌面客户端中可用");
-  },
-  async chooseAppBackground() {
-    return new Promise((resolve) => {
-      const picker = document.createElement("input");
-      picker.type = "file";
-      picker.accept = "image/png,image/jpeg,image/webp,image/gif,image/avif";
-      let settled = false;
-      const finish = (result: {
-        canceled: boolean;
-        url?: string;
-        name?: string;
-      }) => {
-        if (settled) return;
-        settled = true;
-        resolve(result);
-      };
-      picker.addEventListener("change", () => {
-        const file = picker.files?.[0];
-        if (!file) return finish({ canceled: true });
-        finish({
-          canceled: false,
-          url: URL.createObjectURL(file),
-          name: file.name,
-        });
-      });
-      picker.addEventListener("cancel", () => finish({ canceled: true }));
-      picker.click();
-    });
-  },
-  async getAppearancePresets() {
-    return { exists: false, updatedAt: null, presets: [] };
-  },
-  async saveAppearancePresets(presets) {
-    return { updatedAt: new Date().toISOString(), presets };
   },
   onSyncProgress() {
     return () => undefined;
@@ -497,7 +510,12 @@ export const bridge: TheiaBridge = resolveRuntimeBridge({
   nativeBridge: window.theia,
   webBridge,
 });
-export const isDesktop = Boolean(window.theia);
+const runtimeWindow = window as Window & {
+  __THEIA_MOBILE__?: unknown;
+  __THEIA_MOBILE_ENTRY__?: boolean;
+};
+export const isMobile = Boolean(runtimeWindow.__THEIA_MOBILE__ || runtimeWindow.__THEIA_MOBILE_ENTRY__);
+export const isDesktop = Boolean(window.theia && !isMobile);
 
 export function disconnectedStatus(): AuthStatus {
   return {

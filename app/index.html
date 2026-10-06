@@ -2,11 +2,11 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0b1220" />
     <link rel="icon" type="image/png" href="/src/assets/theia-mark.png" />
-    <title>THEIA 移动版</title>
+    <title>BetterBUCT</title>
     <script>
       // ── THEIA legacy polyfills ──────────────────────────────────────────
       // Plain (non-module) script runs BEFORE any ES module. ES5 only, so it
@@ -14,6 +14,7 @@
       // structuredClone, Object.hasOwn, Array.prototype.at, String.replaceAll
       // and possibly globalThis.
       (function () {
+        window.__THEIA_MOBILE_ENTRY__ = true;
         var g = (typeof globalThis !== 'undefined') ? globalThis
                : (typeof self !== 'undefined') ? self
                : (typeof window !== 'undefined') ? window
@@ -51,7 +52,7 @@
           if (window.__THEIA_BOOTED__) return;
           var div = document.createElement('div');
           div.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0b1220;color:#e74c3c;padding:48px 24px;font:14px/1.6 system-ui,sans-serif;white-space:pre-wrap;word-break:break-all;';
-          div.textContent = 'THEIA 应用资源加载失败。\n\nWebView 无法解析应用脚本。\n\n请更新系统 WebView 后重试；或将此截图发给开发者。';
+          div.textContent = 'BetterBUCT 应用资源加载失败。\n\nWebView 无法解析应用脚本。\n\n请更新系统 WebView 后重试；或将此截图发给开发者。';
           document.body.appendChild(div);
         }, 6000);
       })();

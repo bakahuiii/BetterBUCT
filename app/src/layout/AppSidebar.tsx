@@ -1,11 +1,13 @@
-import { useMemo } from "react";
 import { Database, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { useMemo } from "react";
 import { navGroups, navItems } from "../ui/navigation";
-import { SyncChip, type ViewId } from "../ui/app-shared";
+import { isExpiredAssignment, SyncChip, type ViewId } from "../ui/app-shared";
 import type { CampusState } from "../types";
+import { isMobile } from "../bridge";
 
 type AppSidebarProps = {
   state: CampusState;
+  apiBase: string;
   syncing: boolean;
   syncFreshness: {
     kind: "syncing" | "failed" | "idle" | "ready";
@@ -23,8 +25,18 @@ type AppSidebarProps = {
   mark: string;
 };
 
+function apiHostLabel(baseUrl: string) {
+  if (!baseUrl) return "未启动";
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return baseUrl;
+  }
+}
+
 export function AppSidebar({
   state,
+  apiBase,
   syncing,
   syncFreshness,
   view,
@@ -37,8 +49,9 @@ export function AppSidebar({
   onOpenSettings,
   mark,
 }: AppSidebarProps) {
+  const mobileUnsupported = new Set(["advisor", "selection", "mailbox"]);
   const unfinishedAssignments = useMemo(
-    () => state.assignments.filter((item) => item.status !== "submitted").length,
+    () => state.assignments.filter((item) => item.status !== "submitted" && !isExpiredAssignment(item)).length,
     [state.assignments],
   );
   return (
@@ -54,10 +67,10 @@ export function AppSidebar({
         </div>
         <div className="brand">
           <div className="brand-mark">
-            <img src={mark} alt="THEIA" />
+            <img src={mark} alt="BetterBUCT" />
           </div>
           <div className="brand-wordmark">
-            <strong>THEIA</strong>
+            <strong>BetterBUCT</strong>
             <span>Θεία</span>
           </div>
           <button
@@ -83,7 +96,7 @@ export function AppSidebar({
               <span className="nav-group-label">{group.label}</span>
               {group.items.map((id) => {
                 const item = navItems.find((entry) => entry.id === id);
-                if (!item) return null;
+                if (!item || (isMobile && mobileUnsupported.has(id))) return null;
                 const Icon = item.icon;
                 const isSettings = id === "settings";
                 return (
@@ -105,7 +118,7 @@ export function AppSidebar({
                     title={item.label}
                   >
                     <Icon size={19} />
-                    <span>{item.label}</span>
+                    <span>{isMobile && id === "notices" ? "通知" : item.label}</span>
                     {id === "assignments" && unfinishedAssignments > 0 && (
                       <em>{unfinishedAssignments}</em>
                     )}
@@ -132,7 +145,7 @@ export function AppSidebar({
           >
             <Database size={17} />
             <span className="sidebar-api-label">
-              本地 API <span className="api-port">:{state.settings.apiPort}</span>
+              本地 API <span className="api-port">{apiHostLabel(apiBase)}</span>
             </span>
           </button>
         </div>

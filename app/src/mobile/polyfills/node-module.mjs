@@ -1,5 +1,5 @@
 // Browser polyfill for node:module
-import pkg from '../../../package.json' with { type: 'json' };
+import pkg from '../../../package.json';
 
 export function createRequire() {
   return (request) => {

@@ -1,14 +1,33 @@
 import * as cheerio from 'cheerio'
+import { dirname, relative } from 'node:path'
 import { compactError, normalizeText } from '../util.mjs'
-import { AuthRequiredError } from '../source-client.mjs'
+import { AuthRequiredError, isSourceRateLimited } from '../source-client.mjs'
 import { parseTheolAssignments, parseTheolCourse, parseTheolCourseResources, parseTheolHome } from '../parsers/theol.mjs'
-import { parseTheolMobileTaskList } from '../parsers/theol-mobile.mjs'
+import {
+  documentExtension,
+  isAllowedTheolAttachmentContent,
+  parseTheolAttachmentLinks,
+  rewriteTheolAttachmentLinks,
+  isTheolDocumentLink,
+} from '../parsers/theol-archive.mjs'
+import {
+  parseTheolMobileHomeworkDetail,
+  parseTheolMobileTaskList,
+  mobileTaskId,
+  MOBILE_BASE,
+} from '../parsers/theol-mobile.mjs'
+import { parseTheolWorkPage } from '../parsers/theol-work.mjs'
 import { sourceDomainOutcome } from '../domain-provenance.mjs'
+import { selectTheolCurrentTermCourses } from '../sync-helpers.mjs'
+import { extractTheolVisibleText, materializeTheolUeditorFrame } from '../theol-course-archive-store.mjs'
 
 const BASE = 'https://course.buct.edu.cn/meol/'
 const PERSONAL = new URL('personal.do', BASE).toString()
+const COURSE_LIST = new URL('lesson/blen.student.lesson.list.jsp', BASE).toString()
+const WELCOME = new URL('welcomepage/student/index.jsp', BASE).toString()
 const MOBILE_UNDONE_TASKS = 'http://course.buct.edu.cn/mobile/stuUnDoTaskList.do'
-const PARSER_VERSION = 'theol-adapter/4'
+const PARSER_VERSION = 'theol-adapter/7'
+const TASK_LIST_PAGE_LIMIT = 20
 const COURSE_IDENTITY_PARAMETERS = new Set(['courseid', 'lid', 'cateid'])
 
 class CourseContextMismatchError extends Error {
@@ -49,10 +68,11 @@ function taskListCourseIdentityMatches(result, course) {
     const value = String($(node).attr('value') || '').trim()
     if (COURSE_IDENTITY_PARAMETERS.has(name) && value) identities.add(value)
   })
-  $('[href], [action], [src]').each((_index, node) => {
-    for (const attribute of ['href', 'action', 'src']) {
-      addUrlCourseIdentities(identities, $(node).attr(attribute), finalUrl)
-    }
+  // Course-navigation links and embedded resource URLs often carry another
+  // course id on otherwise valid THEOL task pages. Only a form action is
+  // task-context evidence here; ordinary href/src values are not.
+  $('form[action]').each((_index, node) => {
+    addUrlCourseIdentities(identities, $(node).attr('action'), finalUrl)
   })
   $('script, [onclick]').each((_index, node) => {
     const source = `${$(node).html() || ''} ${$(node).attr('onclick') || ''}`
@@ -106,10 +126,91 @@ function isCurrentTask(item, now = Date.now()) {
   return !Number.isFinite(dueAt) || dueAt > now
 }
 
-function taskListLinks(links) {
-  const direct = links.filter((item) => /(?:hwtask|question_test_student_list)/i.test(item.url))
-  if (direct.length) return direct
-  return links.filter((item) => /(?:课程作业|在线测试|作业|测试|hwtask|test|quiz|exam)/i.test(`${item.title} ${item.url}`)).slice(0, 2)
+function taskListLinkKind(item) {
+  const url = String(item?.url || '')
+  if (/hwtask/i.test(url)) return 'assignment'
+  if (/(?:question[\/_]test[\/_]student[\/_]list|question_test_student_list)/i.test(url)) return 'online-test'
+  const value = `${item?.title || ''} ${url}`
+  if (/(?:在线测试|测试|test|quiz|exam)/i.test(value)) return 'online-test'
+  if (/(?:课程作业|作业|任务)/i.test(value)) return 'assignment'
+  return null
+}
+
+function taskListLinks(links, courseId) {
+  const candidates = Array.isArray(links) ? links : []
+  const direct = candidates.filter((item) => /(?:hwtask|question[\/_]test[\/_]student[\/_]list|question_test_student_list)/i.test(String(item?.url || '')))
+  const named = candidates.filter((item) => /(?:课程作业|作业|任务|在线测试|测试|hwtask|test|quiz|exam)/i.test(`${item?.title || ''} ${item?.url || ''}`))
+  const selected = []
+  const seenUrls = new Set()
+  const append = (item) => {
+    const url = String(item?.url || '')
+    if (!url || seenUrls.has(url)) return
+    seenUrls.add(url)
+    selected.push(item)
+  }
+
+  direct.forEach(append)
+  const directKinds = new Set(direct.map(taskListLinkKind).filter(Boolean))
+  const namedKinds = new Set()
+  for (const item of named) {
+    const kind = taskListLinkKind(item)
+    if (!kind || directKinds.has(kind) || namedKinds.has(kind)) continue
+    namedKinds.add(kind)
+    append(item)
+  }
+
+  const id = encodeURIComponent(String(courseId || ''))
+  const fallback = [
+    { title: '\u8bfe\u7a0b\u4f5c\u4e1a', url: new URL(`common/hw/student/hwtask.jsp?lid=${id}`, BASE).toString() },
+    { title: '\u5728\u7ebf\u6d4b\u8bd5', url: new URL(`common/question/test/student/list.jsp?cateId=${id}`, BASE).toString() },
+  ]
+  const selectedKinds = new Set(selected.map(taskListLinkKind).filter(Boolean))
+  if (!selected.length) return fallback
+  // A course page commonly exposes the homework list directly while hiding
+  // the test entry behind a named transfer link. Preserve the existing
+  // homework request pattern, but always probe the missing test list so tests
+  // cannot disappear merely because the two links use different URL shapes.
+  if (!selectedKinds.has('online-test')) append(fallback[1])
+  return selected
+}
+
+function taskListPageUrl(rawHref, baseUrl, courseId = null) {
+  try {
+    const url = new URL(rawHref, baseUrl)
+    const base = new URL(baseUrl)
+    if (url.origin !== base.origin) return null
+    const isTestList = /\/question[\/_]test[\/_]student[\/_]list\.jsp$/i.test(url.pathname)
+    if (!isTestList && !/\/hwtask\.jsp$/i.test(url.pathname)) return null
+    if (courseId) {
+      const parameter = isTestList ? 'cateId' : 'lid'
+      if (!url.searchParams.has(parameter)) url.searchParams.set(parameter, String(courseId))
+    }
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function taskListNextUrl(html, sourceUrl, courseId) {
+  const $ = cheerio.load(String(html || ''))
+  const candidates = []
+  $('a[href]').each((_index, node) => {
+    const label = normalizeText([
+      $(node).text(),
+      $(node).attr('title'),
+      $(node).attr('aria-label'),
+      $(node).find('[title]').first().attr('title'),
+      $(node).find('[alt]').first().attr('alt'),
+    ].filter(Boolean).join(' '))
+    const rel = normalizeText($(node).attr('rel'))
+    if (!/(?:next|下一页|下页)/i.test(`${label} ${rel}`)) return
+    if ($(node).attr('aria-disabled') === 'true' || /(?:disabled|不可用)/i.test($(node).attr('class') || '')) return
+    const url = taskListPageUrl($(node).attr('href'), sourceUrl, courseId)
+    if (!url) return
+    candidates.push({ url, priority: /(?:^|\s)next(?:\s|$)/i.test(rel) ? 0 : 1 })
+  })
+  candidates.sort((left, right) => left.priority - right.priority)
+  return candidates.find((item) => item.url !== sourceUrl)?.url || null
 }
 
 function materialIdentitySafe(result, course) {
@@ -124,35 +225,228 @@ function materialIdentitySafe(result, course) {
   }
 }
 
-async function prefetchTeachingMaterials(client, course, materials, signal) {
-  const candidates = (Array.isArray(materials) ? materials : [])
-    .filter((item) => item?.url && !/(?:download|preview|\.pdf(?:$|\?))/i.test(item.url))
-    .slice(0, 4)
-  const prefetched = []
+function responseHeader(result, name) {
+  return result?.headers?.get?.(name)
+    || result?.headers?.[name]
+    || ''
+}
+
+function ueditorFrameLinks(html, sourceUrl) {
+  const $ = cheerio.load(String(html || ''))
+  const frames = []
+  $('iframe[src], frame[src]').each((_index, node) => {
+    const raw = $(node).attr('src')
+    if (!raw) return
+    try {
+      const url = new URL(raw, sourceUrl)
+      if (url.hostname !== new URL(sourceUrl).hostname || !/\/common\/ueditor\/content\.html$/iu.test(url.pathname)) return
+      frames.push({ node, url: url.toString(), name: url.searchParams.get('name') || $(node).attr('name') || 'content' })
+    } catch {
+      // Ignore malformed or off-campus embedded content.
+    }
+  })
+  return frames
+}
+
+async function archiveTheolPage({ client, archiveStore, kind, parentId, record, pageResult = null, course, signal }) {
+  if (!archiveStore) return null
+  const isDocument = isTheolDocumentLink(record)
+  if (isDocument) {
+    const downloaded = await client.binary(record.url, {
+      source: `${kind === 'assignment' ? '任务' : '课程资料'} ${record.title}`,
+      signal,
+    })
+    if (!isAllowedTheolAttachmentContent({
+      title: record.title,
+      url: downloaded?.url || record.url,
+      contentType: responseHeader(downloaded, 'content-type'),
+    })) throw new Error('THEOL 媒体文件已过滤')
+    return {
+      kind: 'file',
+      ...(await archiveStore.saveAttachment({
+        kind,
+        parentId,
+        attachment: record,
+        buffer: downloaded.buffer,
+        extension: documentExtension({
+          ...record,
+          url: downloaded?.url || record?.url,
+          contentType: responseHeader(downloaded, 'content-type'),
+          contentDisposition: responseHeader(downloaded, 'content-disposition'),
+        }),
+      })),
+      localAttachments: [],
+    }
+  }
+
+  const result = pageResult || await client.page(record.url, {
+    source: `${kind === 'assignment' ? 'Task detail' : 'Course material'} ${record.title || course?.title || ''}`,
+    signal,
+  })
+  if (course && !materialIdentitySafe(result, course)) throw new Error('THEOL returned a different course material context')
+
+  async function archiveHtmlPage(page, pageRecord, frameDepth, visited) {
+    const pageUrl = page.url || pageRecord.url
+    const pagePath = archiveStore.pagePath({ kind, parentId, id: pageRecord.id, title: pageRecord.title })
+    const attachments = parseTheolAttachmentLinks(page.text, { baseUrl: pageUrl })
+    const localAttachments = []
+    const replacements = {}
+    for (const attachment of attachments) {
+      try {
+        const downloaded = await client.binary(attachment.url, {
+          source: `下载附件 ${attachment.title}`,
+          signal,
+        })
+        const contentType = responseHeader(downloaded, 'content-type')
+        if (!isAllowedTheolAttachmentContent({ title: attachment.title, url: downloaded?.url || attachment.url, contentType })) {
+          localAttachments.push({ ...attachment, localStatus: 'skipped-media', localError: '媒体文件已过滤' })
+          continue
+        }
+        const saved = await archiveStore.saveAttachment({
+          kind,
+          parentId,
+          attachment,
+          buffer: downloaded.buffer,
+          extension: documentExtension({
+            ...attachment,
+            url: downloaded?.url || attachment.url,
+            contentType,
+            contentDisposition: responseHeader(downloaded, 'content-disposition'),
+          }),
+        })
+        localAttachments.push({ ...attachment, ...saved })
+        replacements[attachment.url] = relative(dirname(pagePath), saved.localPath).replaceAll('\\', '/')
+      } catch (error) {
+        if (error instanceof AuthRequiredError || signal?.aborted) throw error
+        localAttachments.push({ ...attachment, localStatus: 'failed', localError: compactError(error).slice(0, 240) })
+      }
+    }
+
+    const localFrames = []
+    const frameReplacements = {}
+    if (frameDepth < 3) {
+      for (const [index, frame] of ueditorFrameLinks(page.text, pageUrl).entries()) {
+        if (visited.has(frame.url)) continue
+        const frameRecord = {
+          ...pageRecord,
+          id: `${pageRecord.id}-ueditor-${index + 1}`,
+          title: `${pageRecord.title || '课程资料'}-${frame.name}`,
+        }
+        try {
+          const framePage = await client.page(frame.url, {
+            source: `THEOL 嵌入正文 ${pageRecord.title || ''}`,
+            signal,
+          })
+          const materializedFrame = materializeTheolUeditorFrame(framePage.text, page.text, frame.url)
+          if (!materializedFrame.content && /内容读取中\.\.\./u.test(String(framePage.text || ''))) {
+            throw new Error('THEOL UEditor 正文未包含在父页面，无法保存为离线内容')
+          }
+          const archivedFrame = await archiveHtmlPage(
+            { ...framePage, text: materializedFrame.html },
+            frameRecord,
+            frameDepth + 1,
+            new Set([...visited, frame.url]),
+          )
+          frameReplacements[frame.url] = relative(dirname(pagePath), archivedFrame.localPath).replaceAll('\\', '/')
+          localFrames.push({
+            url: frame.url,
+            title: frameRecord.title,
+            localPath: archivedFrame.localPath,
+            localStatus: archivedFrame.localStatus,
+            localBytes: archivedFrame.localBytes,
+            localSha256: archivedFrame.localSha256,
+            localAttachments: archivedFrame.localAttachments,
+            contentPreview: archivedFrame.contentPreview,
+          })
+          localAttachments.push(...(archivedFrame.localAttachments || []))
+        } catch (error) {
+          if (error instanceof AuthRequiredError || signal?.aborted) throw error
+          localFrames.push({ url: frame.url, title: frameRecord.title, localStatus: 'failed', localError: compactError(error).slice(0, 240) })
+        }
+      }
+    }
+
+    const text = extractTheolVisibleText(page.text)
+    const frameText = localFrames.map((item) => item.contentPreview).filter(Boolean).join(' ')
+    const savedPage = await archiveStore.savePage({
+      kind,
+      parentId,
+      id: pageRecord.id,
+      title: pageRecord.title,
+      html: rewriteTheolAttachmentLinks(page.text, { ...replacements, ...frameReplacements }, { baseUrl: pageUrl }),
+    })
+    const hasFailures = localAttachments.some((item) => item.localStatus === 'failed')
+      || localFrames.some((item) => item.localStatus === 'failed' || item.localStatus === 'partial')
+    return {
+      kind: 'page',
+      url: pageUrl,
+      contentPreview: normalizeText([frameText, text].filter(Boolean).join(' ')).slice(0, 1_200) || null,
+      localAttachments,
+      localFrames,
+      ...savedPage,
+      localStatus: hasFailures ? 'partial' : savedPage.localStatus,
+      ...(hasFailures ? { localError: '部分嵌入正文或附件归档失败' } : {}),
+    }
+  }
+
+  return archiveHtmlPage(result, record, 0, new Set([result.url || record.url]))
+}
+
+async function prefetchTeachingMaterials(client, archiveStore, course, materials, basePage, signal) {
+  const candidates = (Array.isArray(materials) ? materials : []).slice(0, 3)
+  const captured = []
   for (const material of candidates) {
     try {
-      const result = await client.page(material.url, { source: `Course material ${course.title}`, signal })
-      if (!materialIdentitySafe(result, course)) throw new Error('THEOL returned a different course material context')
-      const text = normalizeText(cheerio.load(String(result.text || '')).text())
-      prefetched.push({
-        ...material,
-        url: result.url || material.url,
-        kind: 'page',
-        contentPreview: text.slice(0, 1_200) || null,
-        fetchedAt: new Date().toISOString(),
-        fetchStatus: 'succeeded',
+      const result = material.url === basePage?.url ? basePage : null
+      const archived = await archiveTheolPage({
+        client,
+        archiveStore,
+        kind: 'course',
+        parentId: course.id,
+        record: material,
+        pageResult: result,
+        course,
+        signal,
       })
+      if (!archiveStore) {
+        const page = result || await client.page(material.url, { source: `Course material ${course.title}`, signal })
+        if (!materialIdentitySafe(page, course)) throw new Error('THEOL returned a different course material context')
+        const text = extractTheolVisibleText(page.text)
+        captured.push({ ...material, url: page.url || material.url, contentPreview: text.slice(0, 1_200) || null, fetchedAt: new Date().toISOString(), fetchStatus: 'succeeded' })
+      } else {
+        captured.push({
+          ...material,
+          ...archived,
+          fetchedAt: archived.localCapturedAt,
+          fetchStatus: archived.localStatus === 'saved' ? 'succeeded' : 'partial',
+        })
+      }
     } catch (error) {
       if (error instanceof AuthRequiredError || signal?.aborted) throw error
-      prefetched.push({
+      captured.push({
         ...material,
         fetchStatus: 'failed',
         fetchError: compactError(error).slice(0, 240),
+        localStatus: 'failed',
+        localError: compactError(error).slice(0, 240),
       })
     }
   }
-  const fetchedById = new Map(prefetched.map((item) => [item.id, item]))
-  return (Array.isArray(materials) ? materials : []).map((item) => fetchedById.get(item.id) || item)
+  return captured
+}
+
+function assignmentIdentityMatches(result, assignment) {
+  try {
+    const expected = new URL(assignment.sourceUrl)
+    const actual = new URL(result?.url || '')
+    const expectedParameter = assignment.kind === 'online-test' ? 'testId' : 'hwtid'
+    const expectedId = expected.searchParams.get(expectedParameter)
+    const actualId = actual.searchParams.get(expectedParameter)
+    if (!expectedId || actualId !== expectedId) return false
+    return materialIdentitySafe(result, { id: assignment.courseId })
+  } catch {
+    return false
+  }
 }
 
 function notAttemptedAssignments() {
@@ -167,8 +461,9 @@ function notAttemptedAssignments() {
 }
 
 export class TheolAdapter {
-  constructor(client) {
+  constructor(client, { archiveStore = null } = {}) {
     this.client = client
+    this.archiveStore = archiveStore
   }
 
   async status() {
@@ -195,17 +490,34 @@ export class TheolAdapter {
     let homeResult = await this.client.page(PERSONAL, { source: '北化在线THEOL' })
     let home = parseTheolHome(homeResult.text, homeResult.url)
     if (!home.loggedIn) throw new AuthRequiredError('北化在线THEOL', homeResult.url)
-    if (!home.courses.length) {
-      try {
-        homeResult = await this.client.page(new URL('welcomepage/student/index.jsp', BASE), { source: '北化在线THEOL' })
-        home = parseTheolHome(homeResult.text, homeResult.url)
-      } catch (error) {
-        errors.push(compactError(error))
+    const needsCourses = wants('courses') || wantsCourseDetails
+    if (!home.courses.length && needsCourses) {
+      for (const [index, discoveryUrl] of [COURSE_LIST, WELCOME].entries()) {
+        if (home.courses.length) break
+        try {
+          const discoveryResult = await this.client.page(discoveryUrl, { source: index === 0 ? '北化在线THEOL 课程列表' : '北化在线THEOL 课程页兜底' })
+          const discovered = parseTheolHome(discoveryResult.text, discoveryResult.url)
+          home = {
+            ...home,
+            courses: [...home.courses, ...discovered.courses],
+            notices: [...home.notices, ...discovered.notices],
+          }
+          homeResult = discoveryResult
+        } catch (error) {
+          errors.push(compactError(error))
+        }
       }
     }
 
-    const courses = [...new Map(home.courses.map((item) => [item.id, item])).values()]
+    const discoveredCourses = [...new Map(home.courses.map((item) => [item.id, item])).values()]
+    const courseFilter = selectTheolCurrentTermCourses(discoveredCourses, options.currentTermCourseTitles)
+    const courses = courseFilter.courses
     const notices = [...new Map(home.notices.map((item) => [item.id, item])).values()]
+    if (needsCourses && courses.length === 0) {
+      const error = new Error(`THEOL 课程列表未解析到课程，未确认课程为空${errors.length ? `: ${errors.join('; ')}` : ''}`)
+      error.code = 'theol_course_scan_empty'
+      throw error
+    }
     let detailedCourses = courses
     let detailErrors = []
     if (wantsCourseDetails) {
@@ -247,7 +559,21 @@ export class TheolAdapter {
         ...(wants('notices') ? { notices: outcome(notices, errors.length ? 'partial_notice_scan' : null) } : {}),
       },
       errors,
-      source: { connected: true, checkedAt: capturedAt, url: homeResult.url, errors },
+      source: {
+        connected: true,
+        checkedAt: capturedAt,
+        url: homeResult.url,
+        errors,
+        courseFilter: {
+          enabled: Array.isArray(options.currentTermCourseTitles) && options.currentTermCourseTitles.length > 0,
+          termId: typeof options.currentTermId === 'string' ? options.currentTermId : null,
+          sourceCourseCount: courseFilter.sourceCourseCount,
+          requestedTitleCount: courseFilter.requestedTitleCount,
+          matchedTitleCount: courseFilter.matchedTitleCount,
+          filteredOutCourseCount: courseFilter.filteredOutCourseCount,
+          fallback: courseFilter.fallback,
+        },
+      },
     }
   }
 
@@ -265,9 +591,29 @@ export class TheolAdapter {
         // Syllabus/calendar/basic-info pages are small, stable, and useful in
         // the course dialog. Prefetch only a few page-like links so the normal
         // background detail pass remains bounded and silent.
+        const teachingMaterials = await prefetchTeachingMaterials(
+          this.client,
+          this.archiveStore,
+          parsed,
+          parsed.teachingMaterials,
+          result,
+          signal,
+        )
         parsed = {
           ...parsed,
-          teachingMaterials: await prefetchTeachingMaterials(this.client, parsed, parsed.teachingMaterials, signal),
+          teachingMaterials,
+          resourceLinks: teachingMaterials.map(({ title, url }) => ({ title, url })),
+          description: parsed.description
+            || teachingMaterials.find((item) => item.materialType === 'introduction')?.contentPreview
+            || null,
+        }
+        for (const material of teachingMaterials) {
+          if (material.fetchStatus === 'failed') {
+            errors.push(`${listedCourse.title} · ${material.title}: ${material.fetchError || '课程资料归档失败'}`)
+          }
+          if (material.localStatus === 'partial') {
+            errors.push(`${listedCourse.title} · ${material.title}: ${material.localError || '部分课程资料附件归档失败'}`)
+          }
         }
         detailed.push(parsed)
       } catch (error) {
@@ -356,70 +702,312 @@ export class TheolAdapter {
     }
   }
 
-  async syncAssignments(courses, { shouldContinue = () => true, signal = null } = {}) {
+  async syncMobileAssignments(courses, { signal = null } = {}) {
+    const capturedAt = new Date().toISOString()
+    const listedCourses = Array.isArray(courses)
+      ? courses.filter((item) => item?.source === 'theol' && item.id)
+      : []
+    const payload = await this.client.json(MOBILE_UNDONE_TASKS, {}, {
+      source: 'THEOL mobile pending-task list',
+      signal,
+    })
+    const parsed = parseTheolMobileTaskList(payload, { courses: listedCourses, capturedAt })
+    if (!parsed.authenticated) throw new AuthRequiredError('北化在线THEOL', MOBILE_UNDONE_TASKS)
+    const successfulCourseIds = listedCourses.map((course) => String(course.id))
+    return {
+      assignments: parsed.assignments,
+      successfulCourseIds,
+      failedCourseIds: [],
+      capturedAt,
+      parserVersion: PARSER_VERSION,
+      domainOutcomes: {
+        assignments: sourceDomainOutcome({
+          source: 'theol',
+          attempted: true,
+          succeeded: true,
+          status: 'succeeded',
+          capturedAt,
+          emptyConfirmed: parsed.assignments.length === 0,
+          receivedRecordCount: parsed.assignments.length,
+          completeness: 'complete',
+          parserVersion: PARSER_VERSION,
+        }),
+      },
+      errors: [],
+      source: {
+        connected: true,
+        checkedAt: capturedAt,
+        mobileEndpoint: MOBILE_UNDONE_TASKS,
+        captureMode: 'mobile-list',
+      },
+    }
+  }
+
+  async getMobileAssignmentDetail(assignment, { signal = null } = {}) {
+    if (!assignment?.sourceUrl || assignment.source !== 'theol') {
+      throw new Error('该作业不是北化在线THEOL任务')
+    }
+    const kind = assignment.kind === 'online-test' ? 'online-test' : 'assignment'
+    const taskId = mobileTaskId(assignment.sourceUrl, kind)
+    if (!taskId) throw new Error('THEOL 作业入口缺少有效任务编号')
+    const courseId = String(assignment.courseId || '').trim()
+    if (!/^\d+$/.test(courseId)) throw new Error('THEOL 作业缺少有效课程上下文')
+
+    if (kind === 'online-test') {
+      const page = await this.client.page(assignment.sourceUrl, {
+        source: `THEOL 在线测试 ${assignment.title || ''}`,
+        signal,
+      })
+      const parsed = parseTheolWorkPage(page.text, {
+        baseUrl: page.url,
+        kind,
+        fallbackTitle: assignment.title,
+      })
+      const detail = parseTheolMobileHomeworkDetail({
+        status: 1,
+        datas: {
+          taskTitle: parsed.title || assignment.title,
+          taskContent: parsed.instructions || '',
+          hasSubmit: assignment.status === 'submitted',
+          maySubmit: assignment.status !== 'submitted',
+        },
+      }, { assignment, baseUrl: page.url })
+      return {
+        ...detail,
+        kind,
+        sourceUrl: page.url || assignment.sourceUrl,
+        attachments: parsed.attachments,
+        questions: parsed.questions,
+      }
+    }
+
+    const enterRaw = await this.client.form(`${MOBILE_BASE}enterCourse.do`, {
+      courseId,
+    }, {
+      source: `THEOL 课程上下文 ${assignment.courseName || courseId}`,
+      referer: assignment.courseSourceUrl || assignment.sourceUrl,
+    })
+    try {
+      const enterPayload = JSON.parse(String(enterRaw || ''))
+      if (statusCode(enterPayload?.status) === -2) {
+        throw new AuthRequiredError('北化在线THEOL', `${MOBILE_BASE}enterCourse.do`)
+      }
+    } catch (error) {
+      if (error instanceof AuthRequiredError) throw error
+      // Some THEOL deployments return a small non-JSON success body. The
+      // homeworkView response remains the authoritative detail payload.
+    }
+    const raw = await this.client.form(`${MOBILE_BASE}homeworkView.do`, {
+      hwtid: taskId,
+      context: courseId,
+    }, {
+      source: `THEOL 作业详情 ${assignment.title || taskId}`,
+      referer: assignment.sourceUrl,
+    })
+    const detail = parseTheolMobileHomeworkDetail(raw, {
+      assignment,
+      baseUrl: `${MOBILE_BASE}homeworkView.do`,
+    })
+    if (!detail.authenticated) throw new AuthRequiredError('北化在线THEOL', `${MOBILE_BASE}homeworkView.do`)
+    return {
+      ...detail,
+      kind,
+      sourceUrl: assignment.sourceUrl,
+    }
+  }
+
+  async getMobileAssignmentAttachment(assignment, attachment, { signal = null } = {}) {
+    if (!assignment?.sourceUrl || assignment.source !== 'theol') {
+      throw new Error('该附件不是北化在线THEOL作业附件')
+    }
+    const rawUrl = String(attachment?.url || '').trim()
+    let url
+    try {
+      url = new URL(rawUrl, assignment.sourceUrl)
+    } catch {
+      throw new Error('作业附件链接无效')
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || !/(?:^|\.)course\.buct\.edu\.cn$/iu.test(url.hostname)) {
+      throw new Error('作业附件链接不在北化在线THEOL白名单内')
+    }
+    const binary = this.client.assignmentBinary || this.client.binary
+    if (typeof binary !== 'function') throw new Error('THEOL附件下载客户端未建立')
+    const result = await binary(url.toString(), {
+      source: `THEOL 作业附件 ${attachment?.title || ''}`,
+      referer: assignment.sourceUrl,
+      signal,
+      maxBytes: 32 * 1024 * 1024,
+    })
+    const headers = result?.headers
+    const contentType = result?.contentType || (typeof headers?.get === 'function'
+      ? headers.get('content-type') || null
+      : headers?.['content-type'] || headers?.['Content-Type'] || null)
+    const disposition = typeof headers?.get === 'function'
+      ? headers.get('content-disposition') || null
+      : headers?.['content-disposition'] || headers?.['Content-Disposition'] || null
+    return {
+      buffer: result?.buffer,
+      url: result?.url || url.toString(),
+      contentType,
+      contentDisposition: disposition,
+      title: String(attachment?.title || '').trim() || '作业附件',
+    }
+  }
+
+  async syncAssignments(courses, {
+    shouldContinue = () => true,
+    signal = null,
+    archive = Boolean(this.archiveStore),
+    onCourseResult = null,
+  } = {}) {
     const capturedAt = new Date().toISOString()
     const errors = []
     const assignments = []
     const successfulCourseIds = []
     const failedCourseIds = []
-    const listedCourses = Array.isArray(courses) ? courses.filter((item) => item?.source === 'theol').slice(0, 60) : []
+    const courseTimings = []
+    const incompleteCourseIds = new Set()
+    const listedCourses = Array.isArray(courses)
+      ? courses.filter((item) => item?.source === 'theol' && item.sourceUrl)
+      : []
     let mobileFallback = { attempted: false, status: 'not-needed', added: 0 }
     let mobileFallbackIds = new Set()
     let primaryAssignmentIds = new Set()
+    let rateLimited = false
+    const notifyCourseResult = async (courseId, courseAssignments, complete, error = null) => {
+      if (typeof onCourseResult !== 'function') return
+      await onCourseResult({
+        courseId: String(courseId),
+        assignments: [...courseAssignments],
+        complete: Boolean(complete),
+        error: error ? compactError(error) : null,
+      })
+    }
 
     for (const listedCourse of listedCourses) {
-      if (!shouldContinue()) return { aborted: true, capturedAt, errors }
+      const timingStartedAt = Date.now()
+      let taskPageCount = 0
+      let courseAssignments = []
+      let timingStatus = 'succeeded'
+      const finishTiming = () => {
+        courseTimings.push({
+          courseId: String(listedCourse.id),
+          courseName: listedCourse.title || null,
+          elapsedMs: Math.max(0, Date.now() - timingStartedAt),
+          taskPageCount,
+          assignmentCount: courseAssignments.length,
+          status: timingStatus,
+        })
+      }
+      if (rateLimited) break
+      if (!shouldContinue()) {
+        timingStatus = 'partial'
+        return { aborted: true, capturedAt, errors, courseTimings }
+      }
       try {
         let courseComplete = true
         const courseResult = await this.client.page(listedCourse.sourceUrl, { source: `Course task ${listedCourse.title}`, signal })
-        if (!shouldContinue()) return { aborted: true, capturedAt, errors }
+        if (!shouldContinue()) {
+          timingStatus = 'partial'
+          return { aborted: true, capturedAt, errors, courseTimings }
+        }
         if (!courseIdentityMatches(courseResult, listedCourse)) {
           throw new Error('THEOL returned a different course context')
         }
         const course = parseTheolCourse(courseResult.text, { course: listedCourse, sourceUrl: courseResult.url, capturedAt })
-        const courseAssignments = []
-        for (const taskLink of taskListLinks(course.assignmentLinks || [])) {
-          if (!shouldContinue()) return { aborted: true, capturedAt, errors }
-          try {
-            const taskResult = await this.client.page(taskLink.url, { source: `Task list ${listedCourse.title}`, signal })
-            if (!taskListCourseIdentityMatches(taskResult, listedCourse)) {
-              throw new CourseContextMismatchError('THEOL returned a different course task context')
+        const visitedTaskListUrls = new Set()
+        for (const taskLink of taskListLinks(course.assignmentLinks || [], listedCourse.id)) {
+          if (!shouldContinue()) {
+            timingStatus = 'partial'
+            return { aborted: true, capturedAt, errors, courseTimings }
+          }
+          let nextTaskListUrl = taskListPageUrl(taskLink.url, taskLink.url, listedCourse.id) || taskLink.url
+          let pagesVisited = 0
+          while (nextTaskListUrl) {
+            if (!shouldContinue()) {
+              timingStatus = 'partial'
+              return { aborted: true, capturedAt, errors, courseTimings }
             }
-            courseAssignments.push(...parseTheolAssignments(taskResult.text, { course, sourceUrl: taskResult.url, capturedAt }))
-          } catch (error) {
-            if (!shouldContinue() || signal?.aborted) return { aborted: true, capturedAt, errors }
-            if (error instanceof AuthRequiredError) throw error
-            if (error instanceof CourseContextMismatchError) throw error
-            courseComplete = false
-            errors.push(`${listedCourse.title}: ${compactError(error)}`)
+            if (pagesVisited >= TASK_LIST_PAGE_LIMIT) {
+              courseComplete = false
+              incompleteCourseIds.add(String(listedCourse.id))
+              errors.push(`${listedCourse.title}: THEOL 作业列表分页超过 ${TASK_LIST_PAGE_LIMIT} 页限制`)
+              break
+            }
+            if (visitedTaskListUrls.has(nextTaskListUrl)) break
+            visitedTaskListUrls.add(nextTaskListUrl)
+            try {
+              const taskResult = await this.client.page(nextTaskListUrl, { source: `Task list ${listedCourse.title}`, signal })
+              if (!taskListCourseIdentityMatches(taskResult, listedCourse)) {
+                throw new CourseContextMismatchError('THEOL returned a different course task context')
+              }
+              courseAssignments.push(...parseTheolAssignments(taskResult.text, { course, sourceUrl: taskResult.url, capturedAt }))
+              pagesVisited += 1
+              taskPageCount += 1
+              const candidateNextUrl = taskListNextUrl(taskResult.text, taskResult.url, listedCourse.id)
+              if (candidateNextUrl && visitedTaskListUrls.has(candidateNextUrl)) {
+                courseComplete = false
+                incompleteCourseIds.add(String(listedCourse.id))
+                errors.push(`${listedCourse.title}: THEOL 作业列表分页链接重复`)
+                break
+              }
+              nextTaskListUrl = candidateNextUrl
+            } catch (error) {
+              if (!shouldContinue() || signal?.aborted) {
+                timingStatus = 'partial'
+                return { aborted: true, capturedAt, errors, courseTimings }
+              }
+              if (error instanceof AuthRequiredError) throw error
+              if (error instanceof CourseContextMismatchError) throw error
+              courseComplete = false
+              incompleteCourseIds.add(String(listedCourse.id))
+              errors.push(`${listedCourse.title}: ${compactError(error)}`)
+              rateLimited ||= isSourceRateLimited(error)
+              break
+            }
           }
         }
         assignments.push(...courseAssignments)
         if (courseComplete) successfulCourseIds.push(String(listedCourse.id))
         else failedCourseIds.push(String(listedCourse.id))
+        timingStatus = courseComplete ? 'succeeded' : 'partial'
+        await notifyCourseResult(listedCourse.id, courseAssignments, courseComplete)
       } catch (error) {
-        if (!shouldContinue() || signal?.aborted) return { aborted: true, capturedAt, errors }
-        if (error instanceof AuthRequiredError) throw error
+        if (!shouldContinue() || signal?.aborted) {
+          timingStatus = 'partial'
+          return { aborted: true, capturedAt, errors, courseTimings }
+        }
+        if (error instanceof AuthRequiredError) {
+          timingStatus = 'auth-required'
+          throw error
+        }
+        timingStatus = 'failed'
         failedCourseIds.push(String(listedCourse.id))
         errors.push(`${listedCourse.title}: ${compactError(error)}`)
+        rateLimited ||= isSourceRateLimited(error)
+        await notifyCourseResult(listedCourse.id, [], false, error)
+      } finally {
+        finishTiming()
       }
     }
 
     // The old official mobile endpoint is only a read-only fallback. It has a
     // global pending-task feed, so it can recover the entire course set when a
     // rendered course page changes shape or fails mid-scan.
-    if ((errors.length > 0 || assignments.length === 0) && typeof this.client?.json === 'function') {
+    if (!rateLimited && (errors.length > 0 || assignments.length === 0) && typeof this.client?.json === 'function') {
       try {
         const payload = await this.client.json(MOBILE_UNDONE_TASKS, {}, {
           source: 'THEOL mobile pending-task fallback', signal,
         })
-        if (!shouldContinue()) return { aborted: true, capturedAt, errors }
+        if (!shouldContinue()) return { aborted: true, capturedAt, errors, courseTimings }
         const mobile = parseTheolMobileTaskList(payload, { courses: listedCourses, capturedAt })
         if (mobile.authenticated) {
           primaryAssignmentIds = new Set(assignments.map((item) => item.id))
           mobileFallbackIds = new Set(mobile.assignments.map((item) => item.id))
           assignments.push(...mobile.assignments)
-          for (const course of listedCourses) successfulCourseIds.push(String(course.id))
+          for (const course of listedCourses) {
+            if (!incompleteCourseIds.has(String(course.id))) successfulCourseIds.push(String(course.id))
+          }
           mobileFallback = {
             attempted: true,
             status: 'used',
@@ -430,14 +1018,18 @@ export class TheolAdapter {
           // keep any remaining failures (courses the mobile fallback does
           // not know about) to avoid masking partial scan issues.
           const mobileCourseIds = new Set(mobile.assignments.map((item) => item.courseId).filter(Boolean))
-          const remaining = failedCourseIds.filter((id) => !mobileCourseIds.has(id))
+          const remaining = failedCourseIds.filter((id) => !mobileCourseIds.has(id) || incompleteCourseIds.has(id))
           failedCourseIds.splice(0, failedCourseIds.length, ...remaining)
           // Drop only the error lines for the courses mobile just covered.
           // Anything else stays so a partial scan is never reported as clean.
           const mobileCourseNames = new Set(mobile.assignments.map((item) => item.courseName).filter(Boolean))
+          const incompleteCourseNames = new Set(listedCourses
+            .filter((course) => incompleteCourseIds.has(String(course.id)))
+            .map((course) => course.title)
+            .filter(Boolean))
           const remainingErrors = errors.filter((entry) => {
             const title = String(entry || '').split(':')[0].trim()
-            return !mobileCourseNames.has(title)
+            return incompleteCourseNames.has(title) || !mobileCourseNames.has(title)
           })
           errors.splice(0, errors.length, ...remainingErrors)
         } else {
@@ -450,8 +1042,61 @@ export class TheolAdapter {
     }
 
     const now = Date.now()
-    const currentAssignments = [...new Map(assignments.map((item) => [item.id, item])).values()]
+    let currentAssignments = [...new Map(assignments.map((item) => [item.id, item])).values()]
       .filter((item) => isCurrentTask(item, now))
+    if (archive && this.archiveStore) {
+      const archived = []
+      for (const assignment of currentAssignments) {
+        try {
+          const page = await this.client.page(assignment.sourceUrl, {
+            source: `Task detail ${assignment.title}`,
+            signal,
+          })
+          if (!assignmentIdentityMatches(page, assignment)) {
+            throw new CourseContextMismatchError('THEOL returned a different task detail context')
+          }
+          const parsed = parseTheolWorkPage(page.text, {
+            baseUrl: page.url,
+            kind: assignment.kind,
+            fallbackTitle: assignment.title,
+          })
+          const saved = await archiveTheolPage({
+            client: this.client,
+            archiveStore: this.archiveStore,
+            kind: 'assignment',
+            parentId: assignment.id,
+            record: { ...assignment, title: parsed.title || assignment.title },
+            pageResult: page,
+            signal,
+          })
+          archived.push({
+            ...assignment,
+            localPath: saved.localPath,
+            localStatus: saved.localStatus,
+            localBytes: saved.localBytes,
+            localSha256: saved.localSha256,
+            localCapturedAt: saved.localCapturedAt,
+            localError: saved.localError || null,
+            localAttachments: saved.localAttachments || [],
+            localQuestionCount: parsed.questions.length,
+            localInstructions: saved.contentPreview || parsed.instructions,
+          })
+          if (saved.localStatus !== 'saved') {
+            errors.push(`${assignment.courseName || assignment.courseId} · ${assignment.title}: ${saved.localError || '部分任务附件归档失败'}`)
+          }
+        } catch (error) {
+          if (error instanceof AuthRequiredError || signal?.aborted) throw error
+          archived.push({
+            ...assignment,
+            localStatus: 'failed',
+            localError: compactError(error).slice(0, 240),
+            localCapturedAt: new Date().toISOString(),
+          })
+          errors.push(`${assignment.courseName || assignment.courseId} · ${assignment.title}: ${compactError(error)}`)
+        }
+      }
+      currentAssignments = archived
+    }
     if (mobileFallback.status === 'used') {
       mobileFallback.added = currentAssignments.filter((item) =>
         mobileFallbackIds.has(item.id) && !primaryAssignmentIds.has(item.id)).length
@@ -470,13 +1115,22 @@ export class TheolAdapter {
           status: 'succeeded',
           capturedAt,
           emptyConfirmed: currentAssignments.length === 0,
+          receivedRecordCount: currentAssignments.length,
           completeness: errors.length ? 'partial' : 'complete',
           parserVersion: PARSER_VERSION,
           errorCode: errors.length ? 'partial_assignment_scan' : null,
         }),
       },
       errors,
-      source: { connected: true, checkedAt: capturedAt, errors, mobileFallback },
+      source: {
+        connected: true,
+        checkedAt: capturedAt,
+        errors,
+        mobileFallback,
+        captureMode: archive ? 'archived' : 'list-only',
+        courseTimings,
+        ...(rateLimited ? { rateLimited: true } : {}),
+      },
     }
   }
 }
@@ -486,5 +1140,7 @@ export const THEOL_URLS = {
   login: new URL('homepage/common/sso_login.jsp', BASE).toString(),
   home: PERSONAL,
   personal: PERSONAL,
+  courseList: COURSE_LIST,
+  welcome: WELCOME,
   mobileUndoneTasks: MOBILE_UNDONE_TASKS,
 }

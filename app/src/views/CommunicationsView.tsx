@@ -3,6 +3,7 @@ import { useState } from "react";
 import { MailboxView } from "./MailboxView";
 import { NoticesView } from "./AssignmentsView";
 import type { CampusState } from "../types";
+import { isMobile } from "../bridge";
 
 export function CommunicationsView({ state }: { state: CampusState }) {
   const [mailQuery, setMailQuery] = useState("");
@@ -11,6 +12,7 @@ export function CommunicationsView({ state }: { state: CampusState }) {
 
   return (
     <div className="communications-view">
+      {!isMobile && (
       <section className="communications-pane communications-mailbox-pane" aria-labelledby="mailbox-heading">
         <header className="communications-pane-heading">
           <div className="communications-pane-title">
@@ -38,7 +40,7 @@ export function CommunicationsView({ state }: { state: CampusState }) {
         <div className="communications-pane-content">
           <MailboxView emails={state.emails} query={mailQuery} />
         </div>
-      </section>
+      </section>)}
 
       <section className="communications-pane communications-notices-pane" aria-labelledby="notices-heading">
         <header className="communications-pane-heading">

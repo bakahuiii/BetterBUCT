@@ -1,86 +1,77 @@
-# THEIA 移动版 · 实施进度
+# BetterBUCT Android 实施状态
 
-> 依据 [mobile-native-port-plan.md](mobile-native-port-plan.md) 分阶段交付。
-> 目标：尽量覆盖桌面功能；每天交付可运行增量。
+更新时间：2026-10-02
 
-## 阶段0：技术验证（✅ 完成）
+## 当前完成度
 
-- [x] 搭建 Capacitor 工程骨架（`app/`，vite + React + tailwind，与桌面一致）
-- [x] 复用桌面 `src/`（141 个文件原样拷贝，零改动；新增 `mobile/` 平台适配层）
-- [x] 实现 `platformAdapter`：`install-mobile-bridge.mjs` 同步安装 `window.theia`
-- [x] 实现 `MobileBridge`（完整 TheiaBridge 契约）
-- [x] 分片 JSON store（`theia-sharded-store/v1`，与桌面同 schema），web/native 双后端
-- [x] mock 数据复用桌面 `demo.ts`；Web 构建 + 无头浏览器验证
-- [x] 单元测试 12/12；Android 工程 + SDK/JDK21/Gradle 环境
-- [x] APK：`release/THEIA-mobile-stage0-debug.apk`
+### 基础与界面
 
-## 阶段1：数据层 + 登录（✅ 核心完成）
+- [x] Capacitor Android 工程和 WebView 启动链路
+- [x] 复用桌面 BetterBUCT 当前 `src/` 与 `core/`，移动端只在 `src/mobile/` 增加平台适配
+- [x] 手机安全区、触控目标、底部导航、侧栏抽屉、下拉刷新、深色模式
+- [x] 禁用手机端高成本 3D 场景，保留 BetterBUCT 的字体、颜色、卡片、背景和信息层级
+- [x] 未实现功能从手机导航/设置/仪表盘隐藏，不用 mock 数据冒充真实能力
 
-- [x] 浏览器兼容层：node:crypto（node-forge RSA-PKCS1 v1.5）/ buffer / path / module / perf_hooks polyfill
-- [x] 桌面核心复用：academic-api-client / jwglxt 适配器 / schema.mjs / 全部解析器原样打入 WebView
-- [x] 真实数据同步：campus-sync 跑 JwglxtAdapter（8 域），mergeSyncResult 合入 store
-- [x] TheiaVault（凭据安全存储）、TheiaSession（Cookie jar）
-- [x] 真实 API 优先登录；真实校园管线验证（live 测试 3/3）
-- [ ] `core/store.mjs` 完整能力（锁/恢复/并发）移植（移动端 store 已具备分片 schema，并发锁为桌面多进程场景）
+### 数据与登录
 
-## 阶段2：P0 功能 UI 适配（✅ 完成）
+- [x] App 私有目录分片 JSON 存储，保留 `theia-sharded-store/v1` 结构
+- [x] JWGLXT API 登录、RSA 密码加密、同步与缓存保留
+- [x] Android 原生 `TheiaVaultPlugin`：Android Keystore AES-GCM，不再把密码放在普通 Preferences
+- [x] 旧版移动端编码凭据的一次性迁移
+- [x] 应用重启后静默读取凭据、恢复登录并刷新数据；网络失败时保留本地缓存和凭据
+- [x] 数据导入，以及 JSON/BetterBUCT Feed/ICS/CSV 导出
 
-- [x] 移动布局适配（mobile.css：侧栏浮层/全宽/安全区/触控目标）
-- [x] 下拉刷新手势；移动端 FAB（数据包导入 + 立即同步）
-- [x] 导出升级：原生 Filesystem + Share（web 回退 Blob）
-- [x] 课表/成绩/考试/学业/通知页随桌面视图可用
+### 已开放的移动功能
 
-## 阶段3：P1 功能（✅ 完成，邮箱除外）
+- [x] 概览、课表、成绩/GPA、考试、学业进度
+- [x] 课程基础信息、教务通知、校园地图
+- [x] 北化在线THEOL作业/在线测试列表、截止时间与展开查看详情（只读）
+- [x] 校历、培养计划、空闲教室、场馆状态
+- [x] 手动同步、可选后台同步、同步通知
 
-- [x] THEOL 接入（TheolAdapter + 移动 JSON 端点，best-effort 会话）
-- [x] 受限 WebView CAS 登录原生插件（白名单/HTTPS/禁下载/禁外部导航/Cookie 捕获）
-- [x] 本地通知（同步完成/失败提醒）
-- [x] 场馆（MotionVenueAdapter，匿名 GET）
-- [x] 空闲教室（jwglxt free-classroom 域）
-- [x] 抢课（CourseSelectionService：discover/candidates）
-- [x] **后台同步**：TheiaBackgroundPlugin（WorkManager 周期提醒）+ 应用恢复/网络重连自动同步（JS 触发）
-- [ ] 邮箱（IMAP 需 node:net — 按用户要求不做）
+### 明确不做
 
-## 阶段4：打磨与发布（✅ 基础完成）
+模型顾问、抢课/抢课哨兵、作业工作包/在线提交（移动端只读查看，不自动提交）、校园邮箱 IMAP、课程资料下载缓存、桌面本地 API/MCP/Iris、桌面自动更新、体测/创新学分/第二课堂计算器。
 
-- [x] 应用图标：theia-mark 生成全部 mipmap（传统 + 自适应前景），深蓝背景
-- [x] 启动页：品牌化 splash（深蓝底 + 标记）
-- [x] 深色模式（桌面 appearance 系统原生支持）
-- [x] 离线可用（本地 store + 缓存数据）
-- [x] 版本号 0.2.0（versionCode 2）
-- [x] 真机测试反馈：模拟器白屏 → 已定位并修复（见下方排查记录）
-- [ ] 真机复测（fix1 APK）
+## 2026-09-29 移动端首轮验收修复
 
-### 白屏排查记录（2026-08-28）
-- **根因**：桌面 `src/bridge.ts` 在模块求值时就调用 `structuredClone`；Android WebView < Chromium 98（2022 前）无此 API → 整包 JS 崩溃 → 白屏
-- **修复**：
-  - `install-mobile-bridge.mjs` 顶部加 `structuredClone` polyfill（JSON 方案，数据均 JSON 安全）
-  - 补 `Object.hasOwn` / `Array.prototype.at` / `String.prototype.replaceAll` polyfill
-  - Vite `build.target` es2022 → es2018（旧 WebView 语法兼容）
-  - 全局错误覆盖层：JS 崩溃时屏幕显示错误信息（不再白屏）
-- **验证**：native-sim 测试（headless Chrome 注入 fake Capacitor + Filesystem/Preferences 插件）→ dashboard/数据/FAB 全部渲染，无错误触发
-- **APK（fix1）**：`release/THEIA-mobile-fix1-debug.apk`（107.1MB）
-- **fix2（安卓9 复测仍白屏）**：
-  - 实锤：dist 产物含依赖里的可选链/空值合并（Vite 不转译 node_modules）→ Chromium 74 parse error → 入口模块加载失败 → 白屏（连错误层都不执行）
-  - `legacySyntaxTransformPlugin`：generateBundle 钩子用 esbuild 把所有 chunk 强制降到 chrome74 语法（19/19 chunk 校验通过）
-  - **inline ES5 polyfill**（index.html 非 module script，先于任何 module 执行）：structuredClone/Object.hasOwn/Array.prototype.at/String.replaceAll，且用安全的全局对象访问（`globalThis` 可能不存在）
-  - mock-data 惰性化：模块求值不再调用 structuredClone（import 提升顺序问题）
-  - **启动看门狗**：6 秒未 boot 显示红色错误页（不再纯白屏）
-- **APK（fix2）**：`release/THEIA-mobile-fix2-debug.apk`（107.2MB）
+- [x] 修复保存密码显示完整凭据 JSON 的问题：移动桥接只返回请求的密码字段，输入组件也增加了 JSON 防泄漏兜底
+- [x] 修复手机概览页横向溢出：桌面双栏网格在窄屏统一收敛为单栏，指标和快捷入口保留双列
+- [x] 修复课程页标题被搜索框挤压：移动端搜索移入课程页工具栏
+- [x] 修复考试页显示原始 ISO 时间：统一格式化为中文日期时间
+- [x] 隐藏安卓版未实现的课程资料抓取/打开入口，课程卡片改为课程信息
+- [x] 通知页在安卓版隐藏未实现的校园邮箱面板，不再显示空白邮箱区
+- [x] 修复移动侧栏浅色主题文字接近白色不可读的问题
+- [x] 移动设置页保留设置分类文字标签，避免只显示图标难以识别
+- [x] 地图页去除“Windows 端关闭”文案，改为按平台显示定位能力状态
+- [x] 修复 Android CapacitorHttp 自动跟随重定向导致的“教务 API 返回了非校园网地址”：新增原生 `nativeFetch`，关闭原生自动重定向并由 AcademicApiClient 逐跳校验
+- [x] 修复 Android WebView 不支持 `Buffer.toString('base64url')` 导致的同步失败：改用标准 Base64 转换，覆盖 RSA 登录、公用 ID 和本地令牌，并补充原生 HTTP 登录回归测试
+- [x] 修复安卓版登录后首次教务请求会话失效：原生 HTTP 保留显式 `Cookie` 请求头，并解析 Capacitor Android 合并返回的多条 `Set-Cookie`；覆盖登录页、公钥、RSA 登录提交到首页的完整会话回归
+- [x] 按 2026-09-30 线上正方登录页协议修复登录：保留 `language`/`ydType` 等隐藏字段、清理旧会话、提交带时间戳的登录 action 和两个重复 RSA `mm` 字段；Cookie 请求头在进入 Capacitor 原生层前显式恢复
 
----
+## 2026-10-02 BetterBUCT 重命名与发布准备
 
-## 验收对照（plan §11）
+- [x] Android 启动器、圆形图标、Adaptive Icon 前景和各密度资源统一换为与 THEIA 桌面版相同的二次元标记
+- [x] 启动页统一使用二次元标记；受限校园登录页改用不透明独立主题，避免启动图在 WebView 切换时变形残留
+- [x] 用户可见名称统一为 `BetterBUCT`；applicationId 保持不变以允许旧版安装升级
+- [x] Feed schema 和内部 `theia-*` 协议名保留，确保旧数据包互操作
+- [x] 增加身份/版本回归测试、可选 Release 签名配置模板和发布前 SHA-256 产物
+- [x] 已连接 Android 模拟器安装、启动、概览页和系统桌面图标/名称验收
+- [x] 修复 MOTION 查询前一天等已过期日期时报“date is not exposed”：当公开页不再暴露所选日期时自动切换到最新可用日期，并加入回归测试
 
-- [x] 全新手机安装 APK，登录后看到课表/成绩（API 优先 + WebView CAS 双通道）
-- [x] 离线可查看最近同步数据（分片 store 本地持久化）
-- [x] 至少一条登录路径可用（API 优先已验证真实管线；WebView CAS 已实现待真机验证）
-- [x] 凭据存系统安全存储（vault），导出/日志无明文
-- [x] 数据包可互导（导出 theia-feed + 导入 importDataPackage）
-- [x] 手动同步 + 可选自动同步（恢复/网络重连）
+## 2026-10-02 THEOL 作业查看
 
-## 环境备忘
+- [x] 复用 Courser 已验证的 `stuUnDoTaskList.do` 待办接口；课程上下文使用 `enterCourse.do`，展开详情使用 `homeworkView.do`。
+- [x] 移动端新增“作业”底部入口、按类型/状态筛选、截止时间排序和懒加载详情。
+- [x] 作业正文在进入 React 前移除脚本、表单和非北化域名资源；不实现自动作答或自动提交。
+- [x] 新增 THEOL 移动列表/详情解析和适配器回归测试。
 
-- Node v24.13.0 / npm 11.18.0；JDK 21（`H:\android-sdk\jdk-21`）
-- Android SDK：`H:\android-sdk`；Gradle 8.11.1 本地包（wrapper 指向本地，规避 GitHub 阻断）
-- 校园网可达（jwglxt/course/mail/motion）；live 测试已验证登录页/公钥/RSA
+## 验证记录
+
+- `npm run check`：通过；类型检查、43 项 Node 测试和 Vite 生产构建全部通过
+- `npm run android:build`：通过；debug APK 生成
+- `npm run android:release` / `gradlew.bat assembleRelease`：通过；无私有签名配置时明确生成未签名 Release APK
+- `aapt2 dump badging`：确认 package `io.github.bakahuiii.theia.mobile`、`BetterBUCT`、`versionCode 25`、`versionName 0.2.25`
+- `apksigner verify`：调试包 v1/v2 签名验证通过；未签名 Release 包按预期不通过
+- Android 模拟器 `emulator-5554`：`adb install -r` 成功；启动后显示概览页；返回系统桌面可见 BetterBUCT 名称和二次元图标；启动/安装过程未发现应用崩溃
+- 本轮未把真实校园账号登录、Keystore 密码读写、通知到达和不同 Android 真机网络环境宣称为已验收；Node 测试覆盖了线上登录页、公钥、RSA、Cookie、重定向白名单和缓存保留边界，仍需发布前在真实设备上复测。

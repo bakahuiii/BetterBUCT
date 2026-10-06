@@ -21,7 +21,6 @@ export type ViewId =
   | "dashboard"
   | "advisor"
   | "schedule"
-  | "map"
   | "exams"
   | "grades"
   | "progress"
@@ -30,6 +29,7 @@ export type ViewId =
   | "assignments"
   | "notices"
   | "mailbox"
+  | "notifications"
   | "tools"
   | "settings";
 export type Term = { id: string; label: string };
@@ -41,7 +41,7 @@ function compactTermLabel(label: string) {
   return compact || label;
 }
 
-/** THEIA presents all user-facing instants in the user's campus time zone. */
+/** BetterBUCT presents all user-facing instants in the user's campus time zone. */
 export const THEIA_TIME_ZONE = "Asia/Shanghai";
 
 const SHANGHAI_LOCAL_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;

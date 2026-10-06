@@ -50,7 +50,7 @@ public class TheiaSyncWorker extends Worker {
         try {
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentTitle("THEIA 校园数据待更新")
+                .setContentTitle("BetterBUCT 校园数据待更新")
                 .setContentText("本地数据已较旧，打开应用同步课表与成绩")
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setAutoCancel(true);

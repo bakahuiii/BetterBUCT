@@ -57,7 +57,7 @@ export function installAutoSyncTriggers({ syncNow, getState, onMessage } = {}) {
       const age = Date.now() - lastCompleted;
       if (age > interval) {
         if (typeof onMessage === 'function') onMessage('数据已过期，正在自动同步…');
-        await syncNow().catch(() => undefined);
+        await syncNow({ background: true }).catch(() => undefined);
       }
     });
     cleanups.push(() => handler.remove());
@@ -74,7 +74,7 @@ export function installAutoSyncTriggers({ syncNow, getState, onMessage } = {}) {
       const age = Date.now() - lastCompleted;
       if (age > interval) {
         if (typeof onMessage === 'function') onMessage('网络已恢复，正在自动同步…');
-        await syncNow().catch(() => undefined);
+        await syncNow({ background: true }).catch(() => undefined);
       }
     });
     cleanups.push(() => handler.remove());

@@ -81,7 +81,7 @@ export function ExamsView({
               >
                 <div className="exam-date">
                   <CalendarDays size={20} />
-                  <strong>{exam.examTime || formatDate(exam.startAt)}</strong>
+                  <strong>{formatDate(exam.startAt || exam.examTime)}</strong>
                   <span>{exam.examType || "考试"}</span>
                   {expired && <span className="expired-tag">已过期</span>}
                 </div>

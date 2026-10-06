@@ -1,6 +1,16 @@
 import { AlertCircle, KeyRound, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { bridge } from "../../bridge";
+
+function credentialSecurityCopy() {
+  const native = Boolean(window.Capacitor?.isNativePlatform?.());
+  const preview = Boolean((window as Window & { __THEIA_MOBILE__?: unknown }).__THEIA_MOBILE__) && !native;
+  return native
+    ? "此账号独立于统一身份认证，凭据由 Android Keystore 加密保存，不会进入导出、本地 API 或日志。"
+    : preview
+      ? "此账号独立于统一身份认证，仅保存在当前浏览器预览中，不会进入导出、本地 API 或日志。"
+      : "此账号独立于统一身份认证，使用当前 Windows 账户加密保存，不会进入导出、本地 API 或日志。";
+}
 import { SecretInput } from "../../components/SecretInput";
 import type { AcademicApiCredentialStatus, CampusState } from "../../types";
 
@@ -32,7 +42,9 @@ export function AcademicDataSourceSettings({ state, status, onStatus, onMessage 
     try {
       onStatus(await bridge.saveAcademicApiCredentials({ username, password }));
       setPassword("");
-      onMessage("教务系统 API 凭据已由当前 Windows 账户加密保存。");
+      onMessage(Boolean(window.Capacitor?.isNativePlatform?.())
+        ? "教务系统 API 凭据已由 Android Keystore 加密保存。"
+        : "教务系统 API 凭据已保存。");
     } catch (error) {
       onMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -80,7 +92,7 @@ export function AcademicDataSourceSettings({ state, status, onStatus, onMessage 
           disabled={saving}
         />
         {status.error && <p className="credential-error"><AlertCircle size={15} /> {status.error}</p>}
-        <div className="credential-security"><ShieldCheck size={16} /><span>此账号独立于统一身份认证，使用当前 Windows 账户加密保存，不会进入导出、本地 API 或日志。</span></div>
+        <div className="credential-security"><ShieldCheck size={16} /><span>{credentialSecurityCopy()}</span></div>
         <div className="button-row">
           <button className="primary-button" type="submit" disabled={saving || !status.encryptionAvailable || !username.trim() || !password}><Save size={16} /> {saving ? "正在保存" : status.saved ? "更新 API 凭据" : "保存 API 凭据"}</button>
           {status.saved && <button className="danger-button" type="button" onClick={() => void clear()}><Trash2 size={16} /> 删除凭据</button>}

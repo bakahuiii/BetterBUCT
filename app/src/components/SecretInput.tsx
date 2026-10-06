@@ -3,6 +3,7 @@ import {
   useEffect,
   useId,
   useState,
+  type ChangeEvent,
   type InputHTMLAttributes,
   type ReactNode,
 } from "react";
@@ -47,6 +48,11 @@ export function SecretInput({
     if (hasValue) setRevealedSavedValue(null);
   }, [hasValue]);
 
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (revealedSavedValue !== null) setRevealedSavedValue(null);
+    inputProps.onChange?.(event);
+  };
+
   const toggleVisibility = async () => {
     if (revealed) {
       setRevealed(false);
@@ -62,7 +68,22 @@ export function SecretInput({
     try {
       const secret = await onRevealSaved();
       if (!secret) throw new Error(`没有可显示的${visibilityLabel}`);
-      setRevealedSavedValue(secret);
+      // Defensive boundary: a bridge must return only the requested secret,
+      // but older mobile builds returned the entire credential object as JSON.
+      // Never render a credential record into the input even if an old bridge
+      // or a third-party adapter still returns it.
+      let displaySecret = secret;
+      try {
+        const parsed = JSON.parse(secret);
+        if (parsed && typeof parsed === "object") {
+          const candidate = parsed.password ?? parsed.protocolPassword;
+          if (typeof candidate === "string") displaySecret = candidate;
+        }
+      } catch {
+        // Normal passwords are not JSON; keep the original string.
+      }
+      if (!displaySecret) throw new Error(`没有可显示的${visibilityLabel}`);
+      setRevealedSavedValue(displaySecret);
       setRevealed(true);
     } catch (error) {
       setRevealedSavedValue(null);
@@ -89,8 +110,9 @@ export function SecretInput({
           className="secret-input"
           type={revealed ? "text" : "password"}
           value={displayedValue}
-          readOnly={revealedSavedValue !== null || inputProps.readOnly}
+          readOnly={inputProps.readOnly}
           disabled={disabled}
+          onChange={handleChange}
         />
         <button
           className="secret-input-toggle"

@@ -1,53 +1,59 @@
-import { bridge, isDesktop } from "./bridge";
-import { useState } from "react";
+import { bridge, isDesktop, isMobile } from "./bridge";
+import { useEffect, useState } from "react";
 import theiaMark from "./assets/theia-mark.png";
 import { useTheiaApp } from "./hooks/useTheiaApp";
+import { useGithubUpdateStatus } from "./hooks/useGithubUpdateStatus";
 import { useAppearance } from "./hooks/useAppearance";
-import { usePersonalization } from "./hooks/usePersonalization";
 import { TitleBar } from "./layout/TitleBar";
 import { AppSidebar } from "./layout/AppSidebar";
 import { WorkspaceChrome } from "./layout/WorkspaceChrome";
 import { viewTitles } from "./ui/navigation";
 import { DashboardView } from "./views/DashboardView";
 import { ScheduleView } from "./views/ScheduleView";
-import { CampusMapView } from "./views/CampusMapView";
 import { ExamsView } from "./views/ExamsView";
 import { GradesView } from "./views/GradesView";
 import { AcademicProgressView } from "./views/AcademicProgressView";
 import { CoursesView } from "./views/CoursesView";
 import { CourseSelectionView } from "./views/CourseSelectionView";
 import { AssignmentsView } from "./views/AssignmentsView";
+import { MobileAssignmentsView } from "./views/MobileAssignmentsView";
 import { SettingsView, type SettingsSection } from "./views/SettingsView";
 import { ToolsView } from "./views/ToolsView";
 import { CommunicationsView } from "./views/CommunicationsView";
 import { AdvisorView } from "./views/AdvisorView";
 import { CredentialSetupModal } from "./views/settings/Credentials";
-import { GradientMapFilter } from "./components/GradientMapFilter";
-import { ScenePresetHost } from "./components/ScenePresetHost";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { TooltipProvider } from "./components/ui/tooltip";
 
 export default function App() {
   const app = useTheiaApp();
+  const updateStatus = useGithubUpdateStatus();
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
   useAppearance(); // apply stored dark/light mode on mount
-  const personalization = usePersonalization();
-  const gradientMapActive =
-    personalization.preferences.background === "image" &&
-    personalization.preferences.gradientMap.enabled;
-  const scenePresetActive = personalization.preferences.scene === "parallax-3d";
+  // Notification settings now live inside the Tools surface. Migrate older
+  // persisted/mobile sessions without leaving a dead route behind.
+  useEffect(() => {
+    if (app.view === "notifications") app.setView("tools");
+  }, [app.view, app.setView]);
+  useEffect(() => {
+    if (!isMobile) return;
+    const frame = window.requestAnimationFrame(() => {
+      const workspace = document.querySelector<HTMLElement>(".workspace");
+      workspace?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      const settings = document.querySelector<HTMLElement>(".settings-page-shell");
+      settings?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [app.view, app.settingsOpen]);
+  const mobileUnsupportedViews = new Set(["advisor", "selection", "mailbox"]);
   if (!app.state)
     return (
       <TooltipProvider>
-      <GradientMapFilter
-        active={gradientMapActive}
-        colors={personalization.preferences.gradientMap}
-      />
       <main className="loading-screen">
         <div className="brand-mark">
-          <img src={theiaMark} alt="THEIA" />
+          <img src={theiaMark} alt="BetterBUCT" />
         </div>
-        <strong className="loading-wordmark">THEIA</strong>
+        <strong className="loading-wordmark">BetterBUCT</strong>
         <span
           role={app.startupError ? "alert" : "status"}
           aria-live={app.startupError ? "assertive" : "polite"}
@@ -60,7 +66,12 @@ export default function App() {
 
   const state = app.state;
   const goTo = (view: typeof app.view) => {
+    if (isMobile && mobileUnsupportedViews.has(view)) {
+      app.setMessage("此功能暂未在安卓版实现。", "info");
+      return;
+    }
     app.setView(view);
+    app.setSettingsOpen(false);
     app.setSidebarOpen(false);
   };
   const goToFromPalette = (view: typeof app.view) => {
@@ -68,23 +79,22 @@ export default function App() {
     app.setPaletteOpen(false);
     app.setPaletteQuery("");
   };
+  const academicApiEnabled = state.settings.academicApiEnabled === true;
+  const academicApiConfigured = Boolean(academicApiEnabled && app.academicApiCredentialStatus?.saved);
+  const theolExpected = app.credentials.saved || app.auth.theol.connected;
   const allSourcesConnected =
-    app.auth.jwglxt.connected && app.auth.theol.connected;
+    app.auth.jwglxt.connected && (!theolExpected || app.auth.theol.connected);
 
   return (
     <TooltipProvider>
-    <GradientMapFilter
-      active={gradientMapActive}
-      colors={personalization.preferences.gradientMap}
-    />
     <div
-      className={`app-shell view-${app.view}${app.sidebarCollapsed ? " sidebar-is-collapsed" : ""}`}
+      className={`app-shell view-${app.view}${app.sidebarCollapsed ? " sidebar-is-collapsed" : ""}${isMobile && app.settingsOpen ? " settings-open" : ""}`}
     >
-      <ScenePresetHost active={scenePresetActive} />
       <TitleBar />
       <div className="app-body">
       <AppSidebar
         state={state}
+        apiBase={app.apiBase}
         syncing={app.syncing}
         syncFreshness={app.syncFreshness}
         view={app.view}
@@ -96,14 +106,16 @@ export default function App() {
         onClose={() => app.setSidebarOpen(false)}
         onToggleCollapsed={() => app.setSidebarCollapsed(!app.sidebarCollapsed)}
         onOpenSettings={() => {
-          setSettingsSection("appearance");
+          setSettingsSection(isMobile ? "data" : "appearance");
           app.setSettingsOpen(true);
         }}
       />
       <WorkspaceChrome
         state={state}
         view={app.view}
-        title={viewTitles[app.view]}
+        title={isMobile && app.view === "notices"
+          ? { title: "通知", subtitle: "教务系统与北化在线THEOL动态" }
+          : viewTitles[app.view]}
         auth={app.auth}
         syncing={app.syncing}
         syncPercent={app.syncPercent}
@@ -111,11 +123,14 @@ export default function App() {
         hasSession={app.hasSession}
         allSourcesConnected={allSourcesConnected}
         credentialsSaved={app.credentials.saved}
+        academicApiEnabled={academicApiEnabled}
+        academicApiConfigured={academicApiConfigured}
         query={app.query}
         message={app.message}
         messageKind={app.messageKind}
         syncFailure={app.syncFailure}
         syncFreshness={app.syncFreshness}
+        updateStatus={updateStatus}
         paletteOpen={app.paletteOpen}
         paletteQuery={app.paletteQuery}
         paletteItems={app.paletteItems}
@@ -126,7 +141,7 @@ export default function App() {
         }}
         onQueryChange={app.setQuery}
         onSync={() => void app.sync()}
-        onRequestLogin={() => void app.requestLogin()}
+        onRequestLogin={() => { void app.requestLogin({ interactive: true }).catch(() => undefined); }}
         onDismissMessage={() => app.setMessage(null)}
         onDismissSyncFailure={app.dismissSyncFailure}
         onPaletteQueryChange={app.setPaletteQuery}
@@ -146,7 +161,7 @@ export default function App() {
             advisorError={app.advisorError}
           />
         )}
-        {app.view === "advisor" && (
+        {!isMobile && app.view === "advisor" && (
           <AdvisorView
             overview={app.advisorOverview}
             actions={app.visibleAdvisorActions}
@@ -170,10 +185,10 @@ export default function App() {
             terms={app.visibleTerms}
             calendar={state.dataCatalog.collections.academicCalendar.calendar}
             onExportPdf={() => void app.exportSchedulePdf()}
+            onOpenPdfDirectory={() => void app.openScheduleDirectory()}
             exportingPdf={app.exportingSchedulePdf}
           />
         )}
-        {app.view === "map" && <CampusMapView />}
         {app.view === "exams" && (
           <ExamsView state={state} terms={app.visibleTerms} />
         )}
@@ -201,25 +216,14 @@ export default function App() {
             courses={state.courses}
             state={state}
             query={app.query}
+            onQueryChange={app.setQuery}
             terms={app.visibleTerms}
-            onRefreshResources={async (courseId) => {
-              try {
-                return await bridge.refreshCourseResources(courseId);
-              } catch {
-                return undefined;
-              }
-            }}
-            onDownloadResource={async (courseId, resourceId) => {
-              try {
-                return await bridge.downloadCourseResource(courseId, resourceId);
-              } catch {
-                return undefined;
-              }
-            }}
-            onOpenSource={(url) => bridge.openSource(url)}
+            onOpenMaterial={(courseId, materialId) => app.openCourseMaterial(courseId, materialId)}
+            onRefreshMaterials={() => void app.refreshAcademicDomain("theol-course-details", "课程资料已更新。")}
+            refreshingMaterials={app.academicDomainRefreshing === "theol-course-details"}
           />
         )}
-        {app.view === "selection" && (
+        {!isMobile && app.view === "selection" && (
           <CourseSelectionView
             portal={app.courseSelectionPortal}
             candidates={app.courseSelectionCandidates}
@@ -246,7 +250,14 @@ export default function App() {
             onStop={() => void app.stopCourseSelection()}
           />
         )}
-        {app.view === "assignments" && (
+        {isMobile && app.view === "assignments" && (
+          <MobileAssignmentsView
+            items={state.assignments}
+            refreshing={app.academicDomainRefreshing === "assignments"}
+            onRefresh={() => void app.refreshAcademicDomain("assignments", "作业列表已更新。")}
+          />
+        )}
+        {!isMobile && app.view === "assignments" && (
           <AssignmentsView
             items={state.assignments}
             workspaces={state.workspaces}
@@ -275,7 +286,7 @@ export default function App() {
             modelConfigured={app.modelStatus.configured}
           />
         )}
-        {(app.view === "notices" || app.view === "mailbox") && (
+        {app.view === "notices" && (
           <CommunicationsView state={state} />
         )}
         {app.view === "tools" && (
@@ -294,12 +305,14 @@ export default function App() {
         )}
         </ErrorBoundary>
       </WorkspaceChrome>
+      </div>
       <SettingsView
         open={app.settingsOpen}
         onOpenChange={app.setSettingsOpen}
         initialSection={settingsSection}
         state={state}
         apiBase={app.apiBase}
+        apiStatus={app.apiStatus}
         auth={app.auth}
         credentials={app.credentials}
         academicApiCredentials={
@@ -340,7 +353,6 @@ export default function App() {
             onMessage={app.setMessage}
           />
         )}
-    </div>
     </div>
     </TooltipProvider>
   );

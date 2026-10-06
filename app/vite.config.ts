@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
@@ -30,6 +30,34 @@ function legacySyntaxTransformPlugin() {
       }
     },
   };
+}
+
+const campusProxy: ProxyOptions = {
+  target: 'https://jwglxt.buct.edu.cn',
+  changeOrigin: true,
+  secure: true,
+  rewrite: (path) => path.replace(/^\/__theia-campus/, ''),
+  cookieDomainRewrite: '',
+  cookiePathRewrite: '/',
+  configure(proxy) {
+    proxy.on('proxyReq', (proxyReq) => {
+      // The upstream only needs its own host and does not receive the local
+      // preview Origin header.
+      proxyReq.removeHeader('origin')
+      proxyReq.setHeader('referer', 'https://jwglxt.buct.edu.cn/jwglxt/')
+    })
+    proxy.on('proxyRes', (proxyRes) => {
+      // Secure cookies from HTTPS cannot be stored by an HTTP localhost
+      // preview. Keep the cookie names/values, but make the dev-only jar
+      // usable for the same-origin proxy requests.
+      const cookies = proxyRes.headers['set-cookie']
+      if (Array.isArray(cookies)) {
+        proxyRes.headers['set-cookie'] = cookies.map((cookie) => cookie
+          .replace(/;\s*Secure\b/gi, '')
+          .replace(/;\s*SameSite=None\b/gi, ''))
+      }
+    })
+  },
 }
 
 export default defineConfig({
@@ -73,8 +101,17 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     port: 5175,
+    proxy: {
+      '/__theia-campus': campusProxy,
+    },
+  },
+  preview: {
+    host: '127.0.0.1',
+    proxy: {
+      '/__theia-campus': campusProxy,
+    },
   },
   build: {
     target: 'es2018',

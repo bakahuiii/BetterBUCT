@@ -1,3 +1,4 @@
+import { NETWORK_TIMEOUTS, timeoutMs as timeoutMilliseconds } from './network-config.mjs'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -21,7 +22,7 @@ const SCHEMA = 'theia-academic-calendar-assets/v1'
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/137 Safari/537.36'
 const PROBE_AHEAD_MS = 14 * 24 * 60 * 60 * 1000
 const PROBE_INTERVAL_MS = 6 * 60 * 60 * 1000
-const REQUEST_TIMEOUT_MS = 30_000
+const REQUEST_TIMEOUT_MS = timeoutMilliseconds(NETWORK_TIMEOUTS.ACADEMIC_CALENDAR)
 
 function isoDate(value = new Date()) { return new Date(value).toISOString() }
 
@@ -182,7 +183,9 @@ export class AcademicCalendarAssetsService {
     // OCR failed. Retry that parse on the next refresh even when the source
     // URL is unchanged; otherwise one transient OCR failure would pin stale
     // vacation dates until the university publishes another image.
-    if (calendarChanged || !this.manifest.calendar || this.manifest.calendarError || force) {
+    const calendarNeedsPeriodTimes = Boolean(this.manifest.calendar)
+      && !Object.prototype.hasOwnProperty.call(this.manifest.calendar, 'periodTimes')
+    if (calendarChanged || !this.manifest.calendar || this.manifest.calendarError || calendarNeedsPeriodTimes || force) {
       try {
         this.onDiagnostic('academic_calendar.ocr_started', { key: 'calendar' })
         const calendar = normalizeAcademicCalendar(await this.ocrRunner({ imagePath: this.pathFor('calendar') }))

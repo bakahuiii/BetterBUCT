@@ -1,3 +1,4 @@
+import { APP_NAME } from './app-identity.mjs';
 // Minimal theia-feed/v1 export used by exportData('theia'|'json') and the
 // future import-data flow. Mirrors the desktop ai-export structure.
 export const THEIA_FEED_SCHEMA = 'theia-campus-feed/v1';
@@ -14,7 +15,7 @@ function icsDate(value) {
 
 export function toIcs(state) {
   const now = new Date().toISOString();
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//THEIA//Campus Client//CN', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:THEIA 校园日历'];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${APP_NAME}//Campus Client//CN`, 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${APP_NAME} 校园日历`];
   for (const item of [...(state.exams || []), ...(state.assignments || [])]) {
     const start = icsDate(item.startAt || item.examTime || item.dueAt);
     if (!start) continue;
@@ -24,7 +25,7 @@ export function toIcs(state) {
     lines.push(`DTSTAMP:${icsDate(now)}`);
     lines.push(`DTSTART:${start}`);
     if (end) lines.push(`DTEND:${end}`);
-    lines.push(`SUMMARY:${icsEscape(item.courseName ? `${item.courseName} · ${item.title || (item.examType ? '考试' : '事项')}` : item.title || 'THEIA事项')}`);
+    lines.push(`SUMMARY:${icsEscape(item.courseName ? `${item.courseName} · ${item.title || (item.examType ? '考试' : '事项')}` : item.title || 'BetterBUCT事项')}`);
     lines.push(`DESCRIPTION:${icsEscape([item.location, item.campus, item.status, item.sourceUrl].filter(Boolean).join(' · '))}`);
     lines.push('END:VEVENT');
   }
@@ -72,7 +73,7 @@ export function toTheiaFeed(state) {
   return {
     schema: THEIA_FEED_SCHEMA,
     generatedAt,
-    producer: { name: 'THEIA', version: state.appVersion || '0.0.0', layout: 'normalized-campus-v1' },
+    producer: { name: APP_NAME, version: state.appVersion || '0.0.0', layout: 'normalized-campus-v1' },
     source: { account: state.profile?.studentId ? state.profile.studentId : null },
     profile: state.profile,
     events,

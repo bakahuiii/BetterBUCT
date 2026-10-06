@@ -47,9 +47,17 @@ export function permittedSourceUrl(rawUrl) {
 }
 
 export function permittedAcademicApiUrl(rawUrl) {
+  return permittedCampusApiUrl(rawUrl, ['jwglxt.buct.edu.cn'])
+}
+
+export function permittedCampusApiUrl(rawUrl, allowedHosts = ['jwglxt.buct.edu.cn']) {
   const url = permittedSourceUrl(rawUrl)
-  if (new URL(url).hostname !== 'jwglxt.buct.edu.cn') {
-    throw new Error('Academic API access is restricted to jwglxt.buct.edu.cn')
+  const hostname = new URL(url).hostname.toLowerCase()
+  const allowed = new Set((Array.isArray(allowedHosts) ? allowedHosts : [allowedHosts])
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean))
+  if (!allowed.has(hostname)) {
+    throw new Error(`Campus API access is restricted to ${[...allowed].join(', ') || 'approved campus hosts'}`)
   }
   return url
 }

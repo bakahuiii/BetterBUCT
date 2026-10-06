@@ -1,4 +1,4 @@
-// Browser polyfill for the subset of node:crypto used by THEIA core modules.
+// Browser polyfill for the subset of node:crypto used by BetterBUCT core modules.
 // Enables reusing core/academic-api-client.mjs (RSA PKCS1 v1.5 login) and other
 // core logic inside the Capacitor WebView without modifying the desktop files.
 import forge from 'node-forge';

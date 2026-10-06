@@ -1,4 +1,4 @@
-import { CalendarDays, Download, MapPin, UserRound, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Download, FolderOpen, Grid3X3, List, MapPin, UserRound, X } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { matchTerm, TermSelector, type Term } from "../ui/app-shared";
 import {
   currentAcademicVacation,
-  currentAcademicWeek,
+  currentAcademicWeekForTerms,
   currentShanghaiWeekday,
   occursInWeek,
 } from "../ui/calendar";
@@ -41,6 +41,23 @@ const POPOVER_MARGIN = 14;
 const DAY_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 const DEFAULT_PERIOD_COUNT = 12;
 const MAX_PERIOD_COUNT = 16;
+// BUCT/THEIA current teaching-period timetable.  Mobile builds may not have
+// the optional OCR academic-calendar asset, so keep the display stable by
+// using the same fixed periods as the desktop THEIA timetable.
+const FIXED_PERIOD_TIMES = [
+  { period: 1, startTime: "08:00", endTime: "08:45" },
+  { period: 2, startTime: "08:50", endTime: "09:35" },
+  { period: 3, startTime: "09:45", endTime: "10:30" },
+  { period: 4, startTime: "10:40", endTime: "11:25" },
+  { period: 5, startTime: "11:30", endTime: "12:15" },
+  { period: 6, startTime: "13:30", endTime: "14:15" },
+  { period: 7, startTime: "14:20", endTime: "15:05" },
+  { period: 8, startTime: "15:15", endTime: "16:00" },
+  { period: 9, startTime: "16:05", endTime: "16:50" },
+  { period: 10, startTime: "18:00", endTime: "18:45" },
+  { period: 11, startTime: "18:50", endTime: "19:35" },
+  { period: 12, startTime: "19:40", endTime: "20:25" },
+] as const;
 
 type ScheduleSlot = {
   weekday: number;
@@ -108,6 +125,38 @@ function periodLabel(period: number) {
   return `第${numerals[period] || period}节`;
 }
 
+function periodTimeLabel(calendar: AcademicCalendar | null | undefined, period: number) {
+  const fixed = FIXED_PERIOD_TIMES.find((item) => item.period === period);
+  if (fixed) return `${fixed.startTime}-${fixed.endTime}`;
+  const time = calendar?.periodTimes?.find((item) => item.period === period);
+  return time ? `${time.startTime}-${time.endTime}` : "时间待解析";
+}
+
+const DAY_MILLISECONDS = 86_400_000;
+const TERM_SEMESTER_INDEX: Record<string, number> = { "3": 0, "12": 1, "16": 2 };
+
+function scheduleDayDates(
+  calendar: AcademicCalendar | null | undefined,
+  termId: string,
+  week: number,
+) {
+  if (!calendar?.schoolYear || !Number.isInteger(week) || week < 1) return null;
+  const [year, term] = termId.split("-");
+  if (year !== calendar.schoolYear.slice(0, 4)) return null;
+  const semester = calendar.semesters[TERM_SEMESTER_INDEX[term]];
+  if (!semester?.startDate) return null;
+  const start = Date.parse(semester.startDate + "T00:00:00Z");
+  if (!Number.isFinite(start)) return null;
+  return DAY_LABELS.map((_day, index) => {
+    const date = new Date(start + ((week - 1) * 7 + index) * DAY_MILLISECONDS);
+    return (date.getUTCMonth() + 1) + "月" + date.getUTCDate() + "日";
+  });
+}
+
+function isSelfStudyScheduleItem(item: ScheduleItem) {
+  return /^\s*(?:\[|【)\s*自修\s*(?:\]|】)/u.test(String(item.title || ""));
+}
+
 function clampPopoverPosition(x: number, y: number, height = 420) {
   const viewportWidth = window.innerWidth;
   const availableWidth = Math.max(0, viewportWidth - POPOVER_MARGIN * 2);
@@ -128,12 +177,14 @@ export function ScheduleView({
   terms,
   calendar,
   onExportPdf,
+  onOpenPdfDirectory,
   exportingPdf,
 }: {
   items: ScheduleItem[];
   terms: Term[];
   calendar?: AcademicCalendar | null;
   onExportPdf: () => void;
+  onOpenPdfDirectory: () => void;
   exportingPdf: boolean;
 }) {
   const days = DAY_LABELS;
@@ -141,6 +192,8 @@ export function ScheduleView({
     () => firstScheduledTermId(items, terms),
   );
   const [weekMode, setWeekMode] = useState<"week" | "all">("week");
+  // Keep the original grid as the default; the complete agenda remains one tap away.
+  const [scheduleLayout, setScheduleLayout] = useState<"grid" | "agenda">("grid");
   const [weekNum, setWeekNum] = useState(1);
   const [calendarKey, setCalendarKey] = useState<string | null>(null);
   const [todayNotice, setTodayNotice] = useState<string | null>(null);
@@ -153,7 +206,10 @@ export function ScheduleView({
     if (terms.length && !termFilter) setTermFilter(firstScheduledTermId(items, terms));
   }, [items, terms, termFilter]);
 
-  const currentWeek = useMemo(() => currentAcademicWeek(calendar), [calendar]);
+  const currentWeek = useMemo(
+    () => currentAcademicWeekForTerms(calendar, terms.map((term) => term.id)),
+    [calendar, terms],
+  );
   useEffect(() => {
     if (!currentWeek || calendarKey === currentWeek.key) return;
     setTermFilter(currentWeek.termId);
@@ -166,12 +222,45 @@ export function ScheduleView({
     const timeout = window.setTimeout(() => setTodayNotice(null), 4_000);
     return () => window.clearTimeout(timeout);
   }, [todayNotice]);
+  const changeWeek = (delta: number) => {
+    setWeekMode("week");
+    setWeekNum((current) => Math.min(30, Math.max(1, current + delta)));
+    setPopover(null);
+  };
+
+  useEffect(() => {
+    if (weekMode !== "week") return;
+    const handleWeekKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable
+      ) return;
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        changeWeek(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        changeWeek(1);
+      }
+    };
+    window.addEventListener("keydown", handleWeekKeyDown);
+    return () => window.removeEventListener("keydown", handleWeekKeyDown);
+  }, [weekMode]);
+
   const todayWeekday = currentShanghaiWeekday();
   const isShowingToday = Boolean(
     currentWeek
       && weekMode === "week"
       && termFilter === currentWeek.termId
       && weekNum === currentWeek.week,
+  );
+  const dayDates = useMemo(
+    () => scheduleDayDates(calendar, termFilter, weekNum),
+    [calendar, termFilter, weekNum],
   );
   const showToday = () => {
     const vacation = currentAcademicVacation(calendar);
@@ -211,7 +300,7 @@ export function ScheduleView({
 
   // Older local snapshots did not persist termId for schedule entries. They
   // still belong to the currently loaded timetable and must remain visible.
-  const { slots, unscheduledItems, periodCount, dayCourseCounts } = useMemo(() => {
+  const { slots, unscheduledItems, periodCount } = useMemo(() => {
     const filtered = items.filter(
       (item) => !item.termId || matchTerm(item.termId, termFilter),
     );
@@ -242,7 +331,15 @@ export function ScheduleView({
         items: [item],
       });
     });
-    const slots = [...groupedSlots.values()].sort(
+    const slots = [...groupedSlots.values()].map((slot) => ({
+      ...slot,
+      // Keep every overlapping class in the popover, but make the primary
+      // card deterministic: a taught course takes precedence over a marked
+      // self-study entry when both occupy the same timetable slot.
+      items: [...slot.items].sort(
+        (left, right) => Number(isSelfStudyScheduleItem(left)) - Number(isSelfStudyScheduleItem(right)),
+      ),
+    })).sort(
       (left, right) =>
         left.start - right.start ||
         left.weekday - right.weekday ||
@@ -252,11 +349,20 @@ export function ScheduleView({
       DEFAULT_PERIOD_COUNT,
       ...slots.map((slot) => slot.end),
     );
-    const dayCourseCounts = days.map(
-      (_day, index) => slots.filter((slot) => slot.weekday === index + 1).length,
-    );
-    return { slots, unscheduledItems, periodCount, dayCourseCounts };
+    return { slots, unscheduledItems, periodCount };
   }, [items, termFilter, weekMode, weekNum, days]);
+
+  const mobileDaySlots = useMemo(
+    () => days
+      .map((day, index) => ({
+        day,
+        date: dayDates?.[index] || "日期待定",
+        weekday: index + 1,
+        slots: slots.filter((slot) => slot.weekday === index + 1),
+      }))
+      .filter((entry) => entry.slots.length > 0),
+    [days, dayDates, slots],
+  );
 
   const openCourseDetails = (
     event: React.MouseEvent<HTMLButtonElement>,
@@ -314,7 +420,7 @@ export function ScheduleView({
   };
 
   return (
-    <div className="schedule-scroll">
+    <div className={`schedule-scroll schedule-layout-${scheduleLayout}`}>
       {todayNotice && createPortal(
         <div className="schedule-today-notice" role="status">
           <CalendarDays size={17} />
@@ -391,7 +497,29 @@ export function ScheduleView({
             value={termFilter}
             onChange={setTermFilter}
           />
-          <div className="segmented" role="group" aria-label="课表范围">
+          <div className="schedule-layout-switch segmented" role="group" aria-label="课表显示方式">
+            <button
+              type="button"
+              className={scheduleLayout === "grid" ? "active" : ""}
+              onClick={() => setScheduleLayout("grid")}
+              aria-pressed={scheduleLayout === "grid"}
+              title="网格课表"
+            >
+              <Grid3X3 size={14} aria-hidden="true" />
+              <span>课表</span>
+            </button>
+            <button
+              type="button"
+              className={scheduleLayout === "agenda" ? "active" : ""}
+              onClick={() => setScheduleLayout("agenda")}
+              aria-pressed={scheduleLayout === "agenda"}
+              title="完整课程清单"
+            >
+              <List size={14} aria-hidden="true" />
+              <span>清单</span>
+            </button>
+          </div>
+          <div className="schedule-range-switch segmented" role="group" aria-label="课表范围">
             <button
               className={weekMode === "week" ? "active" : ""}
               onClick={() => setWeekMode("week")}
@@ -406,32 +534,77 @@ export function ScheduleView({
             </button>
           </div>
           {weekMode === "week" && (
-            <label className="week-picker">
-              <span>第</span>
-              <input
-                type="number"
-                min="1"
-                max="30"
-                value={weekNum}
-                onChange={(event) => setWeekNum(Number(event.target.value))}
-                aria-label="当前周次"
-              />
-              <span>周</span>
-            </label>
+            <div className="week-navigator" role="group" aria-label="切换课表周次">
+              <button
+                type="button"
+                className="week-step-button"
+                onClick={() => changeWeek(-1)}
+                disabled={weekNum <= 1}
+                aria-label="上一周"
+                title="上一周（键盘 ←）"
+              >
+                <ChevronLeft size={17} aria-hidden="true" />
+              </button>
+              <div className="week-navigator-current">
+                <span>课表周次</span>
+                <strong>第 {weekNum} 周</strong>
+                <small>
+                  {isShowingToday
+                    ? "本周 · 今天"
+                    : dayDates
+                      ? `${dayDates[0]} – ${dayDates[6]}`
+                      : "可输入周次跳转"}
+                </small>
+              </div>
+              <button
+                type="button"
+                className="week-step-button"
+                onClick={() => changeWeek(1)}
+                disabled={weekNum >= 30}
+                aria-label="下一周"
+                title="下一周（键盘 →）"
+              >
+                <ChevronRight size={17} aria-hidden="true" />
+              </button>
+              <label className="week-navigator-input">
+                <span>跳转</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={weekNum}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    setWeekNum(Number.isFinite(value) ? Math.min(30, Math.max(1, value)) : 1);
+                  }}
+                  aria-label="输入周次"
+                />
+              </label>
+            </div>
           )}
         </div>
-        <button
-          className="secondary-button schedule-pdf-button"
-          onClick={onExportPdf}
-          disabled={exportingPdf}
-          title="调用教务系统原生输出 PDF"
-        >
-          <Download
-            size={17}
-            className={exportingPdf ? "spinning" : undefined}
-          />
-          {exportingPdf ? "正在输出" : "输出 PDF"}
-        </button>
+        <div className="schedule-toolbar-actions">
+          <button
+            className="secondary-button schedule-pdf-button"
+            onClick={onExportPdf}
+            disabled={exportingPdf}
+            title="调用教务系统原生输出 PDF"
+          >
+            <Download
+              size={17}
+              className={exportingPdf ? "spinning" : undefined}
+            />
+            {exportingPdf ? "正在输出" : "输出 PDF"}
+          </button>
+          <button
+            className="secondary-button schedule-directory-button"
+            onClick={onOpenPdfDirectory}
+            title="打开课表 PDF 所在文件夹"
+          >
+            <FolderOpen size={17} />
+            <span>打开本地文件夹</span>
+          </button>
+        </div>
       </div>
 
       <section
@@ -447,7 +620,7 @@ export function ScheduleView({
             style={{ gridColumn: index + 2, gridRow: 1 }}
           >
             <strong>{day}</strong>
-            <span>{dayCourseCounts[index]} 门课程</span>
+            {weekMode === "week" && <span>{dayDates?.[index] || "日期待定"}</span>}
           </header>
         ))}
         {Array.from({ length: periodCount }, (_value, index) => {
@@ -457,8 +630,10 @@ export function ScheduleView({
               className="schedule-period-label"
               key={`period-${period}`}
               style={{ gridColumn: 1, gridRow: period + 1 }}
+              aria-label={`${periodLabel(period)} ${periodTimeLabel(calendar, period)}`}
             >
-              {periodLabel(period)}
+              <span className="schedule-period-number">{periodLabel(period)}</span>
+              <small className="schedule-period-time">{periodTimeLabel(calendar, period)}</small>
             </div>
           );
         })}
@@ -508,7 +683,7 @@ export function ScheduleView({
               aria-label={first.title + "，查看课程详情"}
             >
               <span>
-                {slot.period ? slot.period + " 节" : "节次待定"}
+                {slot.period ? slot.period + "节" : "节次待定"}
                 {stacked && (
                   <span className="stack-badge">{slot.items.length}</span>
                 )}
@@ -517,11 +692,11 @@ export function ScheduleView({
                 {first.title}
                 {stacked && <small> +{slot.items.length - 1}</small>}
               </h3>
-              <p>
+              <p className="course-teacher">
                 <UserRound size={14} />
                 {first.teacher || "教师待定"}
               </p>
-              <p>
+              <p className="course-room">
                 <MapPin size={14} />
                 {first.room || "教室待定"}
               </p>
@@ -529,6 +704,46 @@ export function ScheduleView({
             </button>
           );
         })}
+      </section>
+      <section className="schedule-agenda" aria-label="移动端完整课程列表">
+        {mobileDaySlots.length > 0 ? mobileDaySlots.map((day) => (
+          <section className="schedule-mobile-day" key={day.day}>
+            <header className="schedule-mobile-day-header">
+              <div>
+                <strong>{day.day}</strong>
+                <span>{weekMode === "week" ? day.date : "本学期课程"}</span>
+              </div>
+              <small>{day.slots.length} 门课程</small>
+            </header>
+            <div className="schedule-mobile-day-list">
+              {day.slots.flatMap((slot) => slot.items.map((item, itemIndex) => (
+                <button
+                  type="button"
+                  className="schedule-mobile-course"
+                  key={`${slot.weekday}-${slot.start}-${slot.end}-${item.id}-${itemIndex}`}
+                  style={{ "--course-accent": item.color || COURSE_ACCENTS[0] } as CSSProperties}
+                  onClick={(event) => openCourseDetails(event, slot.items, day.day, slot.period)}
+                  aria-haspopup="dialog"
+                  aria-label={`${item.title}，查看课程详情`}
+                >
+                  <span className="schedule-mobile-course-time">
+                    <strong>{slot.period ? `${slot.period}节` : "节次待定"}</strong>
+                    <small>{periodTimeLabel(calendar, slot.start)}{slot.end !== slot.start ? ` — ${periodTimeLabel(calendar, slot.end).split("-")[1] || ""}` : ""}</small>
+                  </span>
+                  <span className="schedule-mobile-course-main">
+                    <strong>{item.title}</strong>
+                    <span className="schedule-mobile-course-meta"><UserRound size={13} />{item.teacher || "教师待定"}</span>
+                    <span className="schedule-mobile-course-meta"><MapPin size={13} />{item.room || "教室待定"}</span>
+                    <small className="schedule-mobile-course-weeks">{item.weeks || "周次待定"}</small>
+                  </span>
+                  <ChevronRight className="schedule-mobile-course-arrow" size={17} aria-hidden="true" />
+                </button>
+              ))) }
+            </div>
+          </section>
+        )) : (
+          <div className="schedule-mobile-empty">本周暂无课程安排</div>
+        )}
       </section>
       {unscheduledItems.length > 0 && (
         <section className="schedule-unscheduled">

@@ -1,6 +1,5 @@
 import {
   AlertCircle,
-  CircleAlert,
   ChevronRight,
   Clock3,
   LogIn,
@@ -13,16 +12,9 @@ import {
 import { useEffect, useRef, type ReactNode } from "react";
 import { navItems } from "../ui/navigation";
 import { StatusDot, type ViewId } from "../ui/app-shared";
-import type { AuthStatus, CampusState } from "../types";
+import type { AuthStatus, CampusState, GithubUpdateStatus } from "../types";
 import { ThemeMenu } from "../components/ThemeMenu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
+import { GithubUpdateIndicator } from "../components/GithubUpdateIndicator";
 
 type WorkspaceChromeProps = {
   state: CampusState;
@@ -35,10 +27,13 @@ type WorkspaceChromeProps = {
   hasSession: boolean;
   allSourcesConnected: boolean;
   credentialsSaved: boolean;
+  academicApiEnabled?: boolean;
+  academicApiConfigured?: boolean;
   query: string;
   message: string | null;
   messageKind: "info" | "error" | "success";
   syncFailure: string | null;
+  updateStatus: GithubUpdateStatus;
   syncFreshness: {
     kind: "syncing" | "failed" | "idle" | "ready";
     label: string;
@@ -71,10 +66,13 @@ export function WorkspaceChrome({
   hasSession,
   allSourcesConnected,
   credentialsSaved,
+  academicApiEnabled = false,
+  academicApiConfigured = false,
   query,
   message,
   messageKind,
   syncFailure,
+  updateStatus,
   syncFreshness,
   paletteOpen,
   paletteQuery,
@@ -91,9 +89,10 @@ export function WorkspaceChrome({
   onNavigate,
   children,
 }: WorkspaceChromeProps) {
+  const theolExpected = credentialsSaved || auth.theol.connected;
   const sourceEntries = [
     { label: "教务系统", connected: auth.jwglxt.connected },
-    { label: "北化在线THEOL", connected: auth.theol.connected },
+    ...(theolExpected ? [{ label: "北化在线THEOL", connected: auth.theol.connected }] : []),
   ];
   const connectedSources = sourceEntries
     .filter((source) => source.connected)
@@ -131,13 +130,18 @@ export function WorkspaceChrome({
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [paletteOpen]);
+  const authRequired = Boolean(auth.jwglxt.authRequired || auth.theol.authRequired);
   const backgroundAuthPending = credentialsSaved
     && !allSourcesConnected
     && !syncFailure
-    && !auth.jwglxt.authRequired
-    && !auth.theol.authRequired
+    && !authRequired
     && !auth.jwglxt.error
     && !auth.theol.error;
+  // An expired session must remain actionable even while the failed sync is
+  // winding down. The mature desktop client always exposes the auth recovery
+  // action after the bounded automatic attempt has stopped.
+  const apiOnlyConnection = Boolean(academicApiEnabled && academicApiConfigured && !credentialsSaved);
+  const showLoginBanner = authRequired || (!syncing && !backgroundAuthPending && (!hasSession || !allSourcesConnected));
   return (
     <main className="workspace">
       {syncing && (
@@ -181,24 +185,28 @@ export function WorkspaceChrome({
           <section className="login-banner topbar-login-banner auth-pending-banner" role="status" aria-live="polite">
             <RefreshCw size={17} className="spinning" />
             <div>
-              <strong>正在确认统一身份认证会话</strong>
-              <span>CAS 登录已完成，正在分别确认教务系统和北化在线THEOL。</span>
+              <strong>正在自动恢复统一身份认证会话</strong>
+              <span>BetterBUCT 正在使用已保存凭据确认教务系统和北化在线THEOL；完成后会自动继续同步。</span>
             </div>
           </section>
         )}
-        {!syncing && !authVerificationPending && !backgroundAuthPending && (!hasSession || !allSourcesConnected) && (
+        {!authVerificationPending && showLoginBanner && (
           <section className="login-banner topbar-login-banner" role="status">
             <AlertCircle size={17} />
             <div>
               <strong>
-                {hasSession
+                {authRequired
+                  ? "校园会话已失效"
+                  : hasSession
                   ? connectedSources.length
                   ? "校园数据源未完全连接"
                     : "校园数据源未连接"
                   : "连接校园数据"}
               </strong>
               <span>
-                {syncFailure
+                {authRequired
+                  ? "BetterBUCT 已先尝试自动重新登录；仍未完成时，请点击“重新登录”再次恢复校园数据。"
+                  : syncFailure
                   ? "后台恢复未完成；可以继续查看本机已有数据，或重新连接校园数据源。"
                   : !hasSession
                   ? "一次统一身份认证即可连接教务系统和北化在线THEOL；两个来源会分别验证。"
@@ -207,13 +215,34 @@ export function WorkspaceChrome({
                     : "当前没有可用的校园数据源；可以重新连接，或继续查看本机已有数据。"}
               </span>
             </div>
-            <button onClick={onRequestLogin}>
-              <LogIn size={15} />{" "}
-              {hasSession
-                ? "继续登录"
-                : credentialsSaved
-                  ? "重新连接"
-                  : "设置账号"}
+            <button onClick={apiOnlyConnection && !authRequired ? onSync : onRequestLogin}>
+              {apiOnlyConnection && !authRequired ? <RefreshCw size={15} /> : <LogIn size={15} />}{" "}
+              {apiOnlyConnection && !authRequired
+                ? "重试教务 API"
+                : authRequired
+                  ? "重新登录"
+                  : hasSession
+                  ? "继续登录"
+                  : credentialsSaved
+                    ? "重新登录"
+                    : "设置账号"}
+            </button>
+          </section>
+        )}
+        {!authVerificationPending && !authRequired && syncFailure && (
+          <section className="login-banner topbar-login-banner sync-failure-banner" role="alert" aria-live="polite">
+            <AlertCircle size={17} />
+            <div>
+              <strong>校园数据更新失败</strong>
+              <span>{syncFailure}</span>
+              <small>{syncFreshness.detail}；已保留本机已有数据。</small>
+            </div>
+            <button type="button" onClick={onSync} disabled={syncing}>
+              <RefreshCw size={15} className={syncing ? "spinning" : undefined} />
+              {syncing ? "重试中" : "重试同步"}
+            </button>
+            <button type="button" className="login-banner-dismiss" onClick={onDismissSyncFailure} aria-label="关闭更新失败提示" title="关闭提示">
+              <X size={16} />
             </button>
           </section>
         )}
@@ -267,6 +296,7 @@ export function WorkspaceChrome({
           </div>
         </div>
       </header>
+      <GithubUpdateIndicator status={updateStatus} />
       {message && (
         <section className="message-bar" data-kind={messageKind}>
           <AlertCircle size={17} />
@@ -276,33 +306,6 @@ export function WorkspaceChrome({
           </button>
         </section>
       )}
-      <Dialog
-        open={Boolean(syncFailure)}
-        onOpenChange={(open) => { if (!open) onDismissSyncFailure(); }}
-      >
-        {syncFailure && (
-          <DialogContent className="sync-error-dialog" overlayClassName="sync-error-dialog-overlay" showCloseButton={false}>
-            <DialogHeader className="sync-error-dialog-heading">
-              <CircleAlert size={22} />
-              <div>
-                <DialogTitle>同步失败</DialogTitle>
-                <DialogDescription>
-                  {state.sync.lastSuccessAt
-                    ? "本次校园数据更新未完成。THEIA 将继续显示上次成功同步的数据。"
-                    : "本次校园数据更新未完成。THEIA 将继续显示本机已有数据。"}
-                </DialogDescription>
-              </div>
-            </DialogHeader>
-            <div className="sync-error-dialog-message">{syncFailure}</div>
-            <p className="sync-error-dialog-freshness">{syncFreshness.detail}</p>
-            <DialogFooter>
-              <button className="primary-button" onClick={onDismissSyncFailure}>
-                知道了
-              </button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
       <div className="content-area">{children}</div>
       {paletteOpen && (
         <div

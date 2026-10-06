@@ -1,5 +1,5 @@
 // Mobile port of theia-sharded-store/v1 schema
-// Compatible with desktop THEIA store for data interoperability
+// Compatible with desktop BetterBUCT store for data interoperability
 
 export const SHARDED_STORE_SCHEMA = 'theia-sharded-store/v1';
 export const STORE_FRAGMENT_SCHEMA = 'theia-state-fragment/v1';

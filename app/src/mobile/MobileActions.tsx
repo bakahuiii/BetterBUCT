@@ -67,7 +67,7 @@ export default function MobileActions({ bridge, onMessage }: { bridge: any; onMe
         <Download size={20} />
       </button>
       <style>{`
-        .theia-mobile-actions { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 16px); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 200; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+        .theia-mobile-actions { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 16px); bottom: calc(env(safe-area-inset-bottom, 0px) + 76px); z-index: 200; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
         .theia-mobile-fab { width: 52px; height: 52px; border-radius: 50%; background: var(--color-primary, #1296b6); color: #fff; display: flex; align-items: center; justify-content: center; border: none; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; }
         .theia-mobile-action-sheet { display: flex; flex-direction: column; gap: 6px; background: var(--color-card, #1a2233); border: 1px solid var(--color-border, #333); border-radius: 12px; padding: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         .theia-mobile-action-sheet button { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 8px; background: transparent; color: var(--color-foreground, #eee); border: none; cursor: pointer; font-size: 14px; min-height: 40px; width: 100%; }

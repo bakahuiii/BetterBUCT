@@ -1,4 +1,4 @@
-import { BarChart3 } from "lucide-react";
+import { Award, BarChart3, CalendarDays, Gauge, ListChecks } from "lucide-react";
 import { useMemo, useState } from "react";
 // The GPA rule module is shared with the Electron data core.
 import { buildAcademicAnalysis } from "../../core/academic-model.mjs";
@@ -52,7 +52,7 @@ function GpaTrendChart({ grades, terms }: { grades: Grade[]; terms: Term[] }) {
     plottedGpa: metric === "cumulative" ? point.cumulativeGpa : point.gpa,
     plottedCredits: metric === "cumulative" ? point.cumulativeCredits : point.credits,
   })), [metric, points]);
-  const width = Math.max(960, plottedPoints.length * 160);
+  const width = Math.max(360, Math.min(960, Math.max(1, plottedPoints.length - 1) * 150 + 72));
   const height = 206;
   const pad = { left: 40, right: 18, top: 16, bottom: 22 };
   const innerWidth = width - pad.left - pad.right;
@@ -110,7 +110,6 @@ function GpaTrendChart({ grades, terms }: { grades: Grade[]; terms: Term[] }) {
             key={`gpa-semester-${metric}-${animationVersion}`}
             className="gpa-chart"
             viewBox={`0 0 ${width} ${height}`}
-            style={{ minWidth: width }}
             role="img"
             aria-label="GPA 趋势"
           >
@@ -134,24 +133,24 @@ function GpaTrendChart({ grades, terms }: { grades: Grade[]; terms: Term[] }) {
               </g>
             ))}
             <path d={path} pathLength="1" className="gpa-line" />
-            {coords.map((point) => (
-              <g key={point.id}>
-                <circle
-                  cx={point.x}
-                  cy={point.y}
-                  r="5"
-                  className={`gpa-point ${gpaTone(point.plottedGpa)}`}
-                >
-                  <title>{`${point.label}: ${formatGpa(point.plottedGpa)}（${(point.plottedCredits || 0).toFixed(1)} 学分）`}</title>
-                </circle>
-              </g>
-            ))}
+            {coords.map((point) => {
+              const pointGpa = formatGpa(point.plottedGpa);
+              const pointCredits = (point.plottedCredits || 0).toFixed(1);
+              return (
+                <g key={point.id} className="gpa-point-group">
+                  <text x={point.x} y={Math.max(12, point.y - 14)} textAnchor="middle" className="gpa-point-label gpa-point-label-value">{pointGpa}</text>
+                  <circle cx={point.x} cy={point.y} r="5" className={`gpa-point ${gpaTone(point.plottedGpa)}`}>
+                    <title>{`${point.label}: ${pointGpa}（${pointCredits} 学分）`}</title>
+                  </circle>
+                  <text x={point.x} y={Math.min(height - 8, point.y + 23)} textAnchor="middle" className="gpa-point-label gpa-point-label-credit">{pointCredits} 学分</text>
+                </g>
+              );
+            })}
           </svg>
           <div
             className="gpa-timeline"
             style={{
-              minWidth: width,
-              gridTemplateColumns: `repeat(${Math.max(coords.length, 1)}, minmax(150px, 1fr))`,
+              gridTemplateColumns: `repeat(${Math.max(coords.length, 1)}, minmax(0, 1fr))`,
             }}
           >
             {coords.map((point) => (
@@ -228,29 +227,44 @@ export function GradesView({
         />
       </div>
       <GpaTrendChart grades={grades} terms={terms} />
-      <section className="grade-summary">
-        <div>
-          <span>总 GPA</span>
-          <strong className={`gpa-value ${gpaTone(displayedGpa)}`}>
-            {displayedGpa != null ? `${formatGpa(displayedGpa)}/4.33` : "--"}
-          </strong>
-          <small className="gpa-source-label">{gpaSource}</small>
+      <section className="grade-summary" aria-label="成绩概览">
+        <div className="grade-summary-card grade-summary-card-gpa">
+          <span className="grade-summary-icon" aria-hidden="true"><Gauge size={18} /></span>
+          <div className="grade-summary-copy">
+            <span>总 GPA</span>
+            <strong className={`gpa-value ${gpaTone(displayedGpa)}`}>
+              {displayedGpa != null ? `${formatGpa(displayedGpa)}/4.33` : "--"}
+            </strong>
+            <small className="gpa-source-label">{gpaSource}</small>
+          </div>
         </div>
         {termGpa !== null && (
-          <div>
-            <span>本学期 GPA（按成绩）</span>
-            <strong className={`gpa-value ${gpaTone(termGpa)}`}>
-              {formatGpa(termGpa)}/4.33
-            </strong>
+          <div className="grade-summary-card grade-summary-card-term">
+            <span className="grade-summary-icon" aria-hidden="true"><CalendarDays size={18} /></span>
+            <div className="grade-summary-copy">
+              <span>本学期 GPA</span>
+              <strong className={`gpa-value ${gpaTone(termGpa)}`}>
+                {formatGpa(termGpa)}/4.33
+              </strong>
+              <small>按当前筛选成绩计算</small>
+            </div>
           </div>
         )}
-        <div>
-          <span>成绩记录</span>
-          <strong>{filtered.length}</strong>
+        <div className="grade-summary-card grade-summary-card-records">
+          <span className="grade-summary-icon" aria-hidden="true"><ListChecks size={18} /></span>
+          <div className="grade-summary-copy">
+            <span>成绩记录</span>
+            <strong>{filtered.length}</strong>
+            <small>{termFilter ? "当前学期" : "全部学期"}</small>
+          </div>
         </div>
-        <div>
-          <span>已获得学分</span>
-          <strong>{earnedCredits.toFixed(1)}</strong>
+        <div className="grade-summary-card grade-summary-card-credits">
+          <span className="grade-summary-icon" aria-hidden="true"><Award size={18} /></span>
+          <div className="grade-summary-copy">
+            <span>已获得学分</span>
+            <strong>{earnedCredits.toFixed(1)}</strong>
+            <small>按当前筛选成绩</small>
+          </div>
         </div>
       </section>
       {filtered.length ? (

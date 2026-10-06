@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks'
 import * as cheerio from 'cheerio'
+import { toBase64Url } from '../base64url.mjs'
 
 export const MOTION_BASE_URL = 'https://motion.buct.edu.cn/changguanyuyue1/'
 export const MOTION_ENTRY_URL = `${MOTION_BASE_URL}xzxq.php`
@@ -222,6 +223,19 @@ function selection(name, requested, available) {
   if (name === 'date' && !isCalendarDate(value)) throw new TypeError('MOTION date must use YYYY-MM-DD')
   if (name === 'venue' && !publicVenueValue(value)) throw new TypeError('MOTION venue must be a public selector value')
   if (available.values.length && !available.values.includes(value)) {
+    // MOTION only exposes a rolling set of dates on the public page. A cached
+    // selector can therefore legitimately contain yesterday (or another
+    // expired date) even though the fresh page no longer offers it. For dates,
+    // recover by selecting the newest valid public date instead of surfacing a
+    // confusing "not exposed" error. Venue selectors remain strict because a
+    // silent venue change would return a different resource than requested.
+    if (name === 'date') {
+      const latest = available.values
+        .filter((candidate) => isCalendarDate(candidate))
+        .sort()
+        .at(-1)
+      if (latest) return latest
+    }
     throw new RangeError(`MOTION ${name} is not exposed by the public page`)
   }
   return value
@@ -276,7 +290,7 @@ export class MotionVenueAdapter {
       const campus = link.campus || campusFromUrl(parsed, { id: 'unknown', label: '未标注校区' })
       const activity = sanitize(parsed.searchParams.get('xm') || link.label) || '未命名项目'
       return [link.url, {
-        id: `motion-venue-${Buffer.from(`${campus.id}|${activity}|${link.url}`).toString('base64url').slice(0, 20)}`,
+        id: `motion-venue-${toBase64Url(`${campus.id}|${activity}|${link.url}`).slice(0, 20)}`,
         campusId: campus.id,
         campusLabel: campus.label,
         activity,

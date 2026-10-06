@@ -1,4 +1,4 @@
-/* Codex-like advisor workbench. The component uses THEIA semantic tokens so
+/* Codex-like advisor workbench. The component uses BetterBUCT semantic tokens so
  * the workspace stays consistent in both light and dark appearance modes. */
 .view-advisor .content-area {
   width: 100%;
@@ -20,7 +20,7 @@
 }
 
 .advisor-workbench-v2 {
-  /* These are local aliases. They consume THEIA's outer appearance tokens, but
+  /* These are local aliases. They consume BetterBUCT's outer appearance tokens, but
    * never write to the root or keep a second Agent appearance state. */
   --advisor-glass-blur: var(--theia-background-glass-blur);
   --advisor-surface: color-mix(

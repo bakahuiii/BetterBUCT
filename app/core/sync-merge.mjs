@@ -1,8 +1,21 @@
+function mergeLocalArtifactFields(previous, fresh, merged) {
+  if (fresh?.localStatus !== 'failed' || !previous?.localPath) return merged
+  return {
+    ...merged,
+    localPath: previous.localPath,
+    localBytes: previous.localBytes,
+    localSha256: previous.localSha256,
+    localCapturedAt: previous.localCapturedAt,
+    localStatus: 'stale',
+  }
+}
+
 function mergeById(...collections) {
   const map = new Map()
   for (const item of collections.flat()) {
     if (!item?.id) continue
-    map.set(item.id, { ...(map.get(item.id) || {}), ...item })
+    const previous = map.get(item.id)
+    map.set(item.id, mergeLocalArtifactFields(previous, item, { ...(previous || {}), ...item }))
   }
   return [...map.values()]
 }
@@ -87,6 +100,10 @@ export function mergeAcademicExtraDomain(current, fresh, outcome, domain = '') {
     }
     return normalizedFresh
   }
+  // A free-classroom result belongs to one explicit query. Unioning it with a
+  // previous query makes occupied rooms appear available and leaves stale
+  // rooms behind when the new response is empty.
+  if (domain === 'free-classroom') return normalizedFresh
   if (!normalizedCurrent || outcome?.completeness === 'complete') return normalizedFresh
   // Dynamic JWGLXT pages can return one route/detail fragment at a time. Keep
   // the last complete records while replacing refreshed IDs; an empty partial

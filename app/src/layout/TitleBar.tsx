@@ -30,7 +30,7 @@ export function TitleBar() {
     >
       <div className="titlebar-brand">
         <img src={theiaMark} alt="" className="titlebar-icon" />
-        <span className="titlebar-title">THEIA</span>
+        <span className="titlebar-title">BetterBUCT</span>
       </div>
       <div
         className="titlebar-window-actions"

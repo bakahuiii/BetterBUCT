@@ -63,8 +63,17 @@ export function useAppearance() {
     const media = window.matchMedia?.(SYSTEM_QUERY);
     if (!media) return;
     const onChange = (event: MediaQueryListEvent) => setSystemDark(event.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
+    // Older Android WebViews expose addListener instead of addEventListener.
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    }
+    const legacyMedia = media as MediaQueryList & {
+      addListener?: (listener: (event: MediaQueryListEvent) => void) => void;
+      removeListener?: (listener: (event: MediaQueryListEvent) => void) => void;
+    };
+    legacyMedia.addListener?.(onChange);
+    return () => legacyMedia.removeListener?.(onChange);
   }, []);
 
   useEffect(() => {

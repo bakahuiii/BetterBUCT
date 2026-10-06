@@ -8,7 +8,6 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock3,
-  Map as MapIcon,
   MapPin,
   Sparkles,
 } from "lucide-react";
@@ -24,11 +23,12 @@ import {
 } from "../ui/app-shared";
 import {
   currentAcademicVacation,
-  currentAcademicWeek,
+  currentAcademicWeekForTerms,
   currentShanghaiWeekday,
   occursInWeek,
 } from "../ui/calendar";
 import type { AdvisorUrgentItem, CampusState, ScheduleItem } from "../types";
+import { isMobile } from "../bridge";
 
 const DASHBOARD_PREVIEW_LIMIT = 5;
 
@@ -44,8 +44,8 @@ function DashboardAdvisorTop({
   onNavigate: (view: ViewId) => void;
 }) {
   return (
-    <section className="dashboard-advisor-top span-full" aria-label="首要行动">
-      <span className="dashboard-advisor-icon"><Sparkles size={17} /></span>
+    <section className="dashboard-advisor-top span-full" aria-label="首要行动" role="region">
+      <span className="dashboard-advisor-icon" aria-hidden="true"><Sparkles size={17} /></span>
       <span className="dashboard-advisor-copy">
         <small>本地顾问 · Top 1</small>
         <strong>
@@ -60,9 +60,9 @@ function DashboardAdvisorTop({
             || (error ? "请进入工作台检查数据质量。" : "未知或不完整数据不会被解释为没有事项。")}
         </span>
       </span>
-      {item && <em data-severity={item.severity}>{item.severity === "urgent" ? "紧急" : item.severity === "attention" ? "需关注" : "提示"}</em>}
-      <button type="button" onClick={() => onNavigate("advisor")}>
-        打开顾问 <ChevronRight size={15} />
+      {item && <em data-severity={item.severity} aria-label={`优先级：${item.severity === "urgent" ? "紧急" : item.severity === "attention" ? "需关注" : "提示"}`}>{item.severity === "urgent" ? "紧急" : item.severity === "attention" ? "需关注" : "提示"}</em>}
+      <button type="button" onClick={() => onNavigate("advisor")} aria-label="打开本地顾问工作台">
+        打开顾问 <ChevronRight size={15} aria-hidden="true" />
       </button>
     </section>
   );
@@ -93,20 +93,20 @@ function QuickActions({ onNavigate }: { onNavigate: (view: ViewId) => void }) {
       detail: "查看趋势与记录",
       icon: BarChart3,
     },
-    { id: "map", label: "校园地图", detail: "定位教学楼与教室", icon: MapIcon },
   ];
+  const visibleActions = isMobile ? actions.filter(({ id }) => id !== "assignments") : actions;
   return (
-    <section className="quick-actions span-full" aria-label="快速访问">
-      {actions.map(({ id, label, detail, icon: Icon }) => (
-        <button key={id} onClick={() => onNavigate(id)}>
-          <span className="quick-action-icon">
+    <section className="quick-actions span-full" aria-label="快速访问" role="navigation">
+      {visibleActions.map(({ id, label, detail, icon: Icon }) => (
+        <button key={id} onClick={() => onNavigate(id)} aria-label={`${label}：${detail}`}>
+          <span className="quick-action-icon" aria-hidden="true">
             <Icon size={17} />
           </span>
           <span>
             <strong>{label}</strong>
             <small>{detail}</small>
           </span>
-          <ChevronRight size={15} />
+          <ChevronRight size={15} aria-hidden="true" />
         </button>
       ))}
     </section>
@@ -115,8 +115,8 @@ function QuickActions({ onNavigate }: { onNavigate: (view: ViewId) => void }) {
 
 function ScheduleRow({ item }: { item: ScheduleItem }) {
   return (
-    <div className="timeline-row">
-      <div className="period-pill">
+    <div className="timeline-row" role="listitem">
+      <div className="period-pill" aria-label={`第 ${item.period || '待定'} 节`}>
         {item.period ? `${item.period} 节` : "待定"}
       </div>
       <div>
@@ -167,17 +167,19 @@ export function DashboardView({
   } = useMemo(() => {
     const weekday = currentShanghaiWeekday();
     const calendar = state.dataCatalog.collections.academicCalendar.calendar;
-    const academicWeek = currentAcademicWeek(calendar);
+    const timetableTermIds = [
+      ...state.terms.map((term) => term.id),
+      ...state.schedule.map((item) => item.termId || ""),
+    ].filter(Boolean);
+    const academicWeek = currentAcademicWeekForTerms(calendar, timetableTermIds);
     const calendarHasSemesters = Boolean(calendar?.semesters.length);
     const vacation = currentAcademicVacation(calendar);
+    const activeTermId = academicWeek?.termId || timetableTermIds[0] || null;
     const today = state.schedule
       .filter((item) => {
-        if (item.weekday !== weekday) return false;
-        if (vacation) return false;
-        if (!calendarHasSemesters) return true;
-        return academicWeek !== null
-          && (!item.termId || item.termId === academicWeek.termId)
-          && occursInWeek(item.weeks, academicWeek.week);
+        if (item.weekday !== weekday || vacation) return false;
+        if (activeTermId && item.termId && item.termId !== activeTermId) return false;
+        return academicWeek ? occursInWeek(item.weeks, academicWeek.week) : true;
       })
       .sort((left, right) =>
         String(left.period).localeCompare(String(right.period), "zh-CN", {
@@ -211,38 +213,44 @@ export function DashboardView({
         ? { title: `${vacation.label || "假期"}中`, detail: "当前处于校历假期，今天没有教学安排" }
         : calendarHasSemesters && !academicWeek
           ? { title: "当前不在教学周", detail: "校历未将今天归入教学学期，课表不会被解释为没有课程" }
-          : null
+          : activeTermId
+            ? { title: "今天没有课程", detail: (academicWeek && "inferred" in academicWeek && academicWeek.inferred) ? "按当前学期与推算教学周检查，校历同步后会自动校正" : "当前学期今天没有匹配的课程" }
+            : null
       : null;
     return { today, pending, pendingPreview, nextExam, noticePreview, scheduleEmptyState };
-  }, [state.schedule, state.assignments, state.exams, state.notices, state.dataCatalog]);
+  }, [state.schedule, state.terms, state.assignments, state.exams, state.notices, state.dataCatalog]);
 
   return (
     <div className="dashboard-grid">
-      <DashboardAdvisorTop
-        item={advisorItem}
-        loading={advisorLoading}
-        error={advisorError}
-        onNavigate={onNavigate}
-      />
+      {!isMobile && (
+        <DashboardAdvisorTop
+          item={advisorItem}
+          loading={advisorLoading}
+          error={advisorError}
+          onNavigate={onNavigate}
+        />
+      )}
       <QuickActions onNavigate={onNavigate} />
       <section className="metric-strip span-full">
         <button onClick={() => onNavigate("courses")}>
-          <BookOpen />
+          <BookOpen aria-hidden="true" />
           <span>课程</span>
           <strong>{academicCourseCount}</strong>
         </button>
-        <button onClick={() => onNavigate("assignments")}>
-          <CheckCircle2 />
-          <span>待完成</span>
-          <strong>{pending.length}</strong>
-        </button>
+        {!isMobile && (
+          <button onClick={() => onNavigate("assignments")}>
+            <CheckCircle2 aria-hidden="true" />
+            <span>待完成</span>
+            <strong>{pending.length}</strong>
+          </button>
+        )}
         <button onClick={() => onNavigate("exams")}>
-          <ClipboardCheck />
+          <ClipboardCheck aria-hidden="true" />
           <span>考试</span>
           <strong>{state.exams.length}</strong>
         </button>
         <button onClick={() => onNavigate("grades")}>
-          <BarChart3 />
+          <BarChart3 aria-hidden="true" />
           <span>成绩记录</span>
           <strong>{state.grades.length}</strong>
         </button>
@@ -257,11 +265,11 @@ export function DashboardView({
             className="text-command"
             onClick={() => onNavigate("schedule")}
           >
-            完整课表 <ChevronRight size={16} />
+            完整课表 <ChevronRight size={16} aria-hidden="true" />
           </button>
         </div>
         {today.length ? (
-          <div className="timeline-list">
+          <div className="timeline-list" role="list" aria-label="今日课程安排">
             {today.map((item) => (
               <ScheduleRow key={item.id} item={item} />
             ))}
@@ -274,6 +282,7 @@ export function DashboardView({
           />
         )}
       </section>
+{!isMobile && (
       <section className="panel panel-large dashboard-assignments-panel">
         <div className="panel-heading">
           <div>
@@ -284,7 +293,7 @@ export function DashboardView({
             className="text-command"
             onClick={() => onNavigate("assignments")}
           >
-            全部任务 <ChevronRight size={16} />
+            全部任务 <ChevronRight size={16} aria-hidden="true" />
           </button>
         </div>
         {pending.length ? (
@@ -301,6 +310,7 @@ export function DashboardView({
           />
         )}
       </section>
+      )}
       <section className="panel dashboard-exam-panel">
         <div className="panel-heading">
           <div>
@@ -368,7 +378,7 @@ export function DashboardView({
             aria-label="全部通知"
             onClick={() => onNavigate("notices")}
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={18} aria-hidden="true" />
           </button>
         </div>
         {noticePreview.length ? (

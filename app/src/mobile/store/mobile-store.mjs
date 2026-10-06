@@ -1,6 +1,6 @@
 // Mobile port of the desktop CampusStore sharded persistence.
 // Keeps the exact theia-sharded-store/v1 + theia-state-fragment/v1 schema so
-// data can be interchanged with the desktop THEIA via data packages.
+// data can be interchanged with the desktop BetterBUCT via data packages.
 import {
   SHARDED_STORE_SCHEMA,
   STORE_FRAGMENT_SCHEMA,

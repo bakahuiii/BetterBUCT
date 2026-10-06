@@ -11,7 +11,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[THEIA] Uncaught render error:", error, info.componentStack);
+    console.error("[BetterBUCT] Uncaught render error:", error, info.componentStack);
   }
 
   render() {

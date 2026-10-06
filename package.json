@@ -1,7 +1,7 @@
 {
-  "name": "theia-mobile-root",
-  "version": "0.1.0",
+  "name": "betterbuct-mobile-root",
+  "version": "0.2.25",
   "private": true,
-  "description": "THEIA 移动版（THEIA-app）根清单 — 供 core/ 模块读取版本号",
+  "description": "BetterBUCT Android 根清单 — 供 core/ 模块读取版本号",
   "type": "module"
 }

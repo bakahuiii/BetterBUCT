@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>隐私政策 - BetterBUCT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", sans-serif;
+            line-height: 1.7;
+            color: #2c3e50;
+            background: #f8f9fa;
+            padding: 20px;
+            padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+        }
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            padding: 28px 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08);
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        .meta {
+            font-size: 13px;
+            color: #6c757d;
+            margin-bottom: 24px;
+        }
+        h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-top: 32px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #343a40;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        p, li {
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+        ul, ol {
+            padding-left: 24px;
+            margin-bottom: 16px;
+        }
+        li { margin-bottom: 8px; }
+        strong { font-weight: 600; color: #1a1a1a; }
+        .highlight {
+            background: #e7f5ff;
+            border-left: 4px solid #1971c2;
+            padding: 14px 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+        .highlight p { margin-bottom: 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        a {
+            color: #1971c2;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        a:hover { text-decoration: underline; }
+        @media (prefers-color-scheme: dark) {
+            body { background: #0d1117; color: #c9d1d9; }
+            .container { background: #161b22; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+            h1, h2, h3, strong { color: #e6edf3; }
+            .meta { color: #8b949e; }
+            h2 { border-bottom-color: #30363d; }
+            th { background: #21262d; color: #c9d1d9; }
+            th, td { border-bottom-color: #30363d; }
+            .highlight { background: #1c2e4a; border-left-color: #58a6ff; }
+            a { color: #58a6ff; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>BetterBUCT 隐私政策</h1>
+        <p class="meta">生效日期：2024年10月5日</p>
+
+        <h2>概述</h2>
+        <p>BetterBUCT（以下简称"本应用"）是一款面向北京化工大学学生的校园信息管理工具。我们高度重视您的隐私保护。本隐私政策说明了本应用如何收集、使用、存储和保护您的个人信息。</p>
+
+        <h2>数据收集与使用</h2>
+
+        <h3>我们收集的信息</h3>
+        <p>本应用需要您提供以下信息以实现核心功能：</p>
+        <ol>
+            <li><strong>教务系统凭证</strong>
+                <ul>
+                    <li>学号和密码</li>
+                    <li>用途：登录北京化工大学教务管理系统获取课表、成绩、考试等学业数据</li>
+                </ul>
+            </li>
+            <li><strong>北化在线（THEOL）凭证</strong>（可选）
+                <ul>
+                    <li>统一身份认证账号和密码</li>
+                    <li>用途：获取在线课程作业、测试、通知等数据</li>
+                </ul>
+            </li>
+            <li><strong>学业数据</strong>
+                <ul>
+                    <li>课程表、成绩单、考试安排、学业进度</li>
+                    <li>用途：本地展示和数据分析</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>数据存储方式</h3>
+        <div class="highlight">
+            <p><strong>重要承诺：您的所有数据仅存储在您的设备本地，不会上传到任何第三方服务器。</strong></p>
+        </div>
+        <ul>
+            <li><strong>凭证存储</strong>：使用 Android 系统 Keystore 硬件加密存储，采用 AES-GCM 算法</li>
+            <li><strong>学业数据</strong>：存储在应用私有目录</li>
+            <li><strong>离线可用</strong>：所有功能均可离线使用，无需持续网络连接</li>
+        </ul>
+
+        <h2>网络访问</h2>
+        <p>本应用仅在以下情况下访问网络：</p>
+        <ol>
+            <li><strong>校园系统接口</strong>
+                <ul>
+                    <li>北京化工大学教务管理系统（jwglxt.buct.edu.cn）</li>
+                    <li>北化在线平台（course.buct.edu.cn）</li>
+                    <li>用途：同步最新的课表、成绩、作业等数据</li>
+                </ul>
+            </li>
+            <li><strong>无第三方服务</strong>
+                <ul>
+                    <li>本应用不使用任何第三方统计、广告或分析服务</li>
+                    <li>不向开发者或任何第三方发送您的个人数据</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h2>数据安全</h2>
+        <p>我们采取以下措施保护您的数据安全：</p>
+        <ul>
+            <li><strong>传输加密</strong>：所有网络请求使用 HTTPS 加密传输</li>
+            <li><strong>凭证加密</strong>：密码使用 Android Keystore 硬件加密</li>
+            <li><strong>沙箱隔离</strong>：应用数据受 Android 沙箱保护，其他应用无法访问</li>
+            <li><strong>无备份</strong>：应用数据不会被系统自动备份到云端</li>
+        </ul>
+
+        <h2>权限说明</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>权限</th>
+                    <th>用途</th>
+                    <th>必需性</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>INTERNET</td>
+                    <td>访问教务系统和北化在线</td>
+                    <td>必需</td>
+                </tr>
+            </tbody>
+        </table>
+        <p><strong>本应用不申请</strong>：相机、麦克风、位置、联系人、短信、电话、存储等权限。</p>
+
+        <h2>数据删除</h2>
+        <p>您可以随时删除您的数据：</p>
+        <ol>
+            <li><strong>清除凭证</strong>：在应用"设置 → 数据"中点击"清除凭证"</li>
+            <li><strong>清除所有数据</strong>：在系统设置中卸载应用，所有数据将被永久删除</li>
+            <li><strong>数据导出</strong>：在卸载前，可在"设置 → 数据"中导出数据备份</li>
+        </ol>
+
+        <h2>未成年人隐私</h2>
+        <p>本应用面向年满 18 周岁的大学生用户。如果您未满 18 周岁，请在监护人指导下使用本应用。</p>
+
+        <h2>开源声明</h2>
+        <p>本应用为开源软件，源代码托管于 GitHub：</p>
+        <ul>
+            <li>项目地址：<a href="https://github.com/bakahuiii/THEIA-Android">https://github.com/bakahuiii/THEIA-Android</a></li>
+            <li>任何人均可审查代码以验证隐私声明的真实性</li>
+        </ul>
+
+        <h2>隐私政策变更</h2>
+        <p>我们可能不时更新本隐私政策。重大变更将在应用内通知您。继续使用应用即表示您接受更新后的隐私政策。</p>
+
+        <h2>联系我们</h2>
+        <p>如对本隐私政策有任何疑问，请通过以下方式联系：</p>
+        <ul>
+            <li>GitHub Issues: <a href="https://github.com/bakahuiii/THEIA-Android/issues">https://github.com/bakahuiii/THEIA-Android/issues</a></li>
+        </ul>
+
+        <p class="meta" style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e9ecef;">最后更新：2024年10月5日</p>
+    </div>
+</body>
+</html>

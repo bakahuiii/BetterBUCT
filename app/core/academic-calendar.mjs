@@ -1,4 +1,5 @@
 const SEMESTER_CODES = ['3', '12', '16']
+const ACADEMIC_CALENDAR_TIME_ZONE = 'Asia/Shanghai'
 
 function dateOnly(value) {
   const text = String(value || '').trim()
@@ -7,6 +8,29 @@ function dateOnly(value) {
 
 function text(value, max = 100) {
   return String(value || '').trim().replace(/[（(：:，,]+$/, '').trim().slice(0, max) || null
+}
+
+function clockTime(value) {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/u)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (hour > 23 || minute > 59) return null
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+function normalizePeriodTimes(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((item) => {
+      const period = Number(item?.period)
+      const startTime = clockTime(item?.startTime)
+      const endTime = clockTime(item?.endTime)
+      if (!Number.isInteger(period) || period < 1 || period > 16 || !startTime || !endTime || startTime >= endTime) return null
+      return { period, startTime, endTime }
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.period - right.period)
+    .filter((item, index, items) => index === 0 || item.period !== items[index - 1].period)
 }
 
 export function normalizeAcademicCalendar(value) {
@@ -38,6 +62,7 @@ export function normalizeAcademicCalendar(value) {
     semesters,
     vacations,
     specialDates,
+    periodTimes: normalizePeriodTimes(source.periodTimes),
   }
 }
 
@@ -45,12 +70,18 @@ export function academicCalendarWeek(calendar, value = new Date()) {
   const normalized = normalizeAcademicCalendar(calendar)
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return null
-  const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const day = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: ACADEMIC_CALENDAR_TIME_ZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
+  const day = `${parts.year}-${parts.month}-${parts.day}`
+  // Calculate elapsed days from stable UTC dates after extracting the China
+  // date. This keeps the result correct around local midnight on every host.
+  const localDate = new Date(`${day}T00:00:00Z`)
   const semesterIndex = normalized.semesters.findIndex((item) => item.startDate <= day && day <= item.endDate)
   if (semesterIndex < 0) return null
   const semester = normalized.semesters[semesterIndex]
-  const start = new Date(`${semester.startDate}T00:00:00`).getTime()
+  const start = new Date(`${semester.startDate}T00:00:00Z`).getTime()
   const week = Math.min(semester.weeks, Math.max(1, Math.floor((localDate.getTime() - start) / 604_800_000) + 1))
   const year = Number.parseInt(String(normalized.schoolYear || '').slice(0, 4), 10)
   return {
@@ -67,6 +98,11 @@ export function academicCalendarWeek(calendar, value = new Date()) {
 export function nextAcademicCalendarBoundary(calendar, value = new Date()) {
   const normalized = normalizeAcademicCalendar(calendar)
   const now = value instanceof Date ? value : new Date(value)
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  if (Number.isNaN(now.getTime())) return null
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: ACADEMIC_CALENDAR_TIME_ZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
+  const today = `${parts.year}-${parts.month}-${parts.day}`
   return normalized.semesters.find((item) => item.startDate > today)?.startDate || null
 }

@@ -52,7 +52,7 @@ const TOOL_NAME_ZH: Record<string, string> = {
   sync_campus_data: "同步校园数据",
   network_request: "请求网络资源",
   open_campus_source: "打开校园页面",
-  update_theia_settings: "更新 THEIA 设置",
+  update_theia_settings: "更新 BetterBUCT 设置",
   control_course_selection: "控制选课任务",
   read_file: "读取文件",
   write_file: "写入文件",
@@ -161,7 +161,7 @@ function advisorAvailability(modelStatus: ModelStatus) {
   if (!isDesktop) {
     return {
       title: "Agent 需要桌面客户端",
-      detail: "当前是浏览器预览，只展示界面；请打开 THEIA 桌面客户端使用 Agent。",
+      detail: "当前是浏览器预览，只展示界面；请打开 BetterBUCT 桌面客户端使用 Agent。",
     };
   }
   if (modelStatus.configured) return null;
@@ -545,7 +545,7 @@ export function AdvisorWorkbench({
             </button>
             <span className="advisor-v2-agent-mark" aria-hidden="true"><Bot className="size-4" /></span>
             <span className="advisor-v2-header-copy">
-              <strong id="advisor-workbench-title">THEIA Agent</strong>
+              <strong id="advisor-workbench-title">BetterBUCT Agent</strong>
               <small>{current ? threadTitle(current) : "学业顾问"}</small>
             </span>
           </div>
@@ -608,7 +608,7 @@ export function AdvisorWorkbench({
           ref={conversationRef}
           className="advisor-v2-conversation"
           aria-live="polite"
-          aria-label="THEIA Agent 对话"
+          aria-label="BetterBUCT Agent 对话"
           onScroll={(event) => {
             const element = event.currentTarget;
             stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
@@ -641,7 +641,7 @@ export function AdvisorWorkbench({
                 <div className="advisor-v2-live-answer" aria-label="正在生成回答">
                   <span className="advisor-v2-message-avatar is-assistant" aria-hidden="true"><Bot className="size-4" /></span>
                   <div className="advisor-v2-live-copy">
-                    <span className="advisor-v2-speaker">THEIA Agent</span>
+                    <span className="advisor-v2-speaker">BetterBUCT Agent</span>
                     <AdvisorMarkdown source={streamText.text} live />
                     <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                   </div>
@@ -658,7 +658,7 @@ export function AdvisorWorkbench({
             <div className="advisor-v2-empty">
               <span className="advisor-v2-empty-mark" aria-hidden="true"><Bot className="size-6" /></span>
               <h2>从一个问题开始</h2>
-              <p>THEIA 会根据你的问题检索本地校园数据，并把可核对的依据带回对话。</p>
+              <p>BetterBUCT 会根据你的问题检索本地校园数据，并把可核对的依据带回对话。</p>
               <div className="advisor-v2-suggestions" aria-label="常用问题">
                 <button type="button" onClick={() => { setQuestion("结合我的培养方案，下一学期应该优先安排什么课程？"); composerRef.current?.focus(); }}>
                   <span>课程安排</span><span>下一学期怎么选课</span>

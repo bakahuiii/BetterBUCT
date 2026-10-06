@@ -2,6 +2,9 @@
 // src/bridge.ts resolves window.theia to our adapter, then mount the desktop
 // React app unchanged, plus mobile-only enhancements.
 import './install-mobile-bridge.mjs';
+if (typeof document !== 'undefined') {
+  document.documentElement.dataset.theiaMobile = 'true';
+}
 // Modules are executing — disarm the boot watchdog.
 declare global {
   interface Window {
@@ -13,7 +16,16 @@ declare global {
   }
 }
 window.__THEIA_BOOTED__ = true;
-import { useState } from 'react';
+
+// 初始化崩溃收集
+import { initCrashReporter } from './crash-reporter';
+initCrashReporter('0.2.25');
+
+// 初始化开机自启动监听
+import { initBootReceiver } from './boot-receiver';
+initBootReceiver();
+
+import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import MobileActions from './MobileActions';
 import MobileTabBar from './MobileTabBar';
@@ -48,6 +60,29 @@ try {
 // Mount mobile-only UI (FAB) after the desktop app mounts.
 function MobileEnhancements() {
   const [message, setMessage] = useState<{ text: string; kind: string } | null>(null);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 监听同步进度事件
+    const handleProgress = (progress: import('../types').SyncProgressEvent) => {
+      if (progress?.status === 'syncing' && progress?.label) {
+        setSyncProgress(progress.label);
+      } else if (progress?.status === 'done') {
+        // 成功完成，2秒后清除
+        setTimeout(() => setSyncProgress(null), 2000);
+      } else if (progress?.status === 'error') {
+        // 错误信息显示更久，让用户有时间看清
+        setTimeout(() => setSyncProgress(null), 5000);
+      }
+    };
+
+    const bridgeAny = bridge as any;
+    bridgeAny.events?.on('sync-progress', handleProgress);
+    return () => {
+      bridgeAny.events?.off('sync-progress', handleProgress);
+    };
+  }, []);
+
   return (
     <>
       <MobileActions
@@ -78,11 +113,50 @@ function MobileEnhancements() {
           {message.text}
         </div>
       )}
+      {syncProgress && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 'calc(env(safe-area-inset-top, 0px) + 60px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(18, 150, 182, 0.95)',
+            color: '#fff',
+            padding: '12px 20px',
+            borderRadius: '12px',
+            zIndex: 400,
+            fontSize: '14px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            maxWidth: '88vw',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}
+        >
+          <div
+            style={{
+              width: '16px',
+              height: '16px',
+              border: '2px solid rgba(255,255,255,0.3)',
+              borderTopColor: '#fff',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }}
+          />
+          <span>{syncProgress}</span>
+        </div>
+      )}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+function mountMobileEnhancements() {
+  if (document.getElementById('theia-mobile-enhancements')) return;
   const host = document.createElement('div');
   host.id = 'theia-mobile-enhancements';
   document.body.appendChild(host);
@@ -90,6 +164,15 @@ window.addEventListener('DOMContentLoaded', () => {
   installPullToRefresh({
     onRefresh: () => bridge.syncNow().catch(() => undefined),
   } as never);
-});
+}
+
+// The native WebView can resume this entry after DOMContentLoaded has already
+// fired.  Mount immediately in that case; otherwise the old one-shot listener
+// silently skipped the gesture installer and left only the top-right button.
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', mountMobileEnhancements, { once: true });
+} else {
+  mountMobileEnhancements();
+}
 
 export {};
