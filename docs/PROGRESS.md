@@ -8,8 +8,8 @@
 
 - [x] Capacitor Android 工程和 WebView 启动链路
 - [x] 复用桌面 BetterBUCT 当前 `src/` 与 `core/`，移动端只在 `src/mobile/` 增加平台适配
-- [x] 手机安全区、触控目标、底部导航、侧栏抽屉、下拉刷新、深色模式
-- [x] 禁用手机端高成本 3D 场景，保留 BetterBUCT 的字体、颜色、卡片、背景和信息层级
+- [x] 手机安全区、触控目标、底部导航、下拉刷新、深色模式
+- [x] 移动端移除地图、字体资源、3D 场景和背景图，使用轻量的原生界面层级
 - [x] 未实现功能从手机导航/设置/仪表盘隐藏，不用 mock 数据冒充真实能力
 
 ### 数据与登录
@@ -24,7 +24,7 @@
 ### 已开放的移动功能
 
 - [x] 概览、课表、成绩/GPA、考试、学业进度
-- [x] 课程基础信息、教务通知、校园地图
+- [x] 课程基础信息和教务通知
 - [x] 北化在线THEOL作业/在线测试列表、截止时间与展开查看详情（只读）
 - [x] 校历、培养计划、空闲教室、场馆状态
 - [x] 手动同步、可选后台同步、同步通知
@@ -56,7 +56,7 @@
 - [x] 用户可见名称统一为 `BetterBUCT`；applicationId 保持不变以允许旧版安装升级
 - [x] Feed schema 和内部 `theia-*` 协议名保留，确保旧数据包互操作
 - [x] 增加身份/版本回归测试、可选 Release 签名配置模板和发布前 SHA-256 产物
-- [x] 已连接 Android 模拟器安装、启动、概览页和系统桌面图标/名称验收
+- [x] 已完成 APK 包信息、签名和自动化测试验证；设备安装验收需在 ADB 可见目标设备时执行
 - [x] 修复 MOTION 查询前一天等已过期日期时报“date is not exposed”：当公开页不再暴露所选日期时自动切换到最新可用日期，并加入回归测试
 
 ## 2026-10-02 THEOL 作业查看
@@ -72,6 +72,6 @@
 - `npm run android:build`：通过；debug APK 生成
 - `npm run android:release` / `gradlew.bat assembleRelease`：通过；无私有签名配置时明确生成未签名 Release APK
 - `aapt2 dump badging`：确认 package `io.github.bakahuiii.theia.mobile`、`BetterBUCT`、`versionCode 25`、`versionName 0.2.25`
-- `apksigner verify`：调试包 v1/v2 签名验证通过；未签名 Release 包按预期不通过
-- Android 模拟器 `emulator-5554`：`adb install -r` 成功；启动后显示概览页；返回系统桌面可见 BetterBUCT 名称和二次元图标；启动/安装过程未发现应用崩溃
+- `apksigner verify`：正式 Release APK 的 v1/v2 签名验证通过
+- Android 设备安装验收：本轮执行时 ADB 未发现可用设备，因此未将安装、启动和真实登录结果写成已完成
 - 本轮未把真实校园账号登录、Keystore 密码读写、通知到达和不同 Android 真机网络环境宣称为已验收；Node 测试覆盖了线上登录页、公钥、RSA、Cookie、重定向白名单和缓存保留边界，仍需发布前在真实设备上复测。

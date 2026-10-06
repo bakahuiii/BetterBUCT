@@ -257,7 +257,7 @@ app/android/app/src/main/
 
 1. **立即执行**：
    ```bash
-   cd /h/work/THEIA-app/app
+   cd app
    npm run cap:sync
    npm run android:build
    ```
