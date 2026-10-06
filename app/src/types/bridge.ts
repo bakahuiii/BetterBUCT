@@ -265,6 +265,7 @@ export interface GithubUpdateProgress {
 export interface GithubUpdateStatus {
   supported: boolean;
   state: "unsupported" | "idle" | "checking" | "available" | "downloading" | "downloaded" | "not-available" | "error";
+  installPermissionRequired?: boolean;
   currentVersion: string;
   availableVersion: string | null;
   releaseName: string | null;
@@ -273,6 +274,9 @@ export interface GithubUpdateStatus {
   progress: GithubUpdateProgress | null;
   updateSizeBytes: number | null;
   error: string | null;
+  downloadUrl?: string | null;
+  assetName?: string | null;
+  releaseUrl?: string | null;
 }
 
 declare global {

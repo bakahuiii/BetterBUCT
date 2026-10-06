@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞和凭据泄露
+    url: https://github.com/bakahuiii/BetterBUCT/security/advisories/new
+    about: 请使用私密安全通告，不要在公开 Issue 中提交密码、Cookie 或可利用细节。
+  - name: 项目文档
+    url: https://github.com/bakahuiii/BetterBUCT/tree/main/docs
+    about: 开发、架构、发布和实施状态说明集中在 docs/ 目录。
+

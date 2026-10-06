@@ -71,7 +71,7 @@ export function AppSidebar({
           </div>
           <div className="brand-wordmark">
             <strong>BetterBUCT</strong>
-            <span>Θεία</span>
+            <span>校园信息工作台</span>
           </div>
           <button
             type="button"

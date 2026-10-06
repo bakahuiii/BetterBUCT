@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TheiaHttpPlugin.class);
         registerPlugin(TheiaBackgroundPlugin.class);
         registerPlugin(TheiaBatteryPlugin.class);
+        registerPlugin(TheiaUpdatePlugin.class);
         super.onCreate(savedInstanceState);
         if (getBridge() != null && getBridge().getWebView() != null) {
             android.webkit.WebSettings settings = getBridge().getWebView().getSettings();

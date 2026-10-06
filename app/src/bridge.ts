@@ -129,6 +129,7 @@ function unsupportedUpdateStatus(): GithubUpdateStatus {
   return {
     supported: false,
     state: "unsupported",
+    installPermissionRequired: false,
     currentVersion: webState.appVersion || "web",
     availableVersion: null,
     releaseName: null,

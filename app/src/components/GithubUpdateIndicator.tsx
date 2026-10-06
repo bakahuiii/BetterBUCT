@@ -29,7 +29,7 @@ function formatSpeed(value: number) {
 function statusCopy(status: GithubUpdateStatus) {
   switch (status.state) {
     case "checking":
-      return { title: "正在检查更新", detail: "正在连接 COS / GitHub 更新服务" };
+      return { title: "正在检查更新", detail: "正在连接 GitHub 更新服务" };
     case "available":
       return {
         title: "发现新版本",
@@ -43,13 +43,12 @@ function statusCopy(status: GithubUpdateStatus) {
     case "downloaded":
       return {
         title: "更新已下载",
-        detail: `v${status.availableVersion || "未知版本"}，退出应用后自动安装`,
+        detail: `v${status.availableVersion || "未知版本"}，点击安装更新`,
       };
     case "error":
-      return {
-        title: "自动更新失败",
-        detail: status.error || "稍后可在关于页面重试",
-      };
+      return status.installPermissionRequired
+        ? { title: "需要安装权限", detail: "请允许 BetterBUCT 安装应用，然后点击“打开安装权限设置”" }
+        : { title: "自动更新失败", detail: status.error || "稍后可在关于页面重试" };
     default:
       return null;
   }
@@ -109,23 +108,23 @@ export function GithubUpdateIndicator({ status }: { status: GithubUpdateStatus }
         {updateSize > 0 && status.state !== "downloading" && (
           <div className="github-update-indicator-size">文件大小：{formatBytes(updateSize)}</div>
         )}
-        {status.state === "available" && (
+        {(status.state === "available" || status.installPermissionRequired) && (
           <div className="github-update-indicator-actions">
             <button
               type="button"
               className="primary-button"
-              onClick={() => void bridge.downloadUpdate()}
+              onClick={() => void (status.installPermissionRequired ? bridge.installUpdate() : bridge.downloadUpdate())}
             >
-              <Download size={14} aria-hidden="true" />
-              更新
+              {status.installPermissionRequired ? <CheckCircle2 size={14} aria-hidden="true" /> : <Download size={14} aria-hidden="true" />}
+              {status.installPermissionRequired ? "打开安装权限设置" : "更新"}
             </button>
-            <button
+            {!status.installPermissionRequired && <button
               type="button"
               className="secondary-button"
               onClick={() => void bridge.skipUpdateVersion()}
             >
               跳过版本
-            </button>
+            </button>}
           </div>
         )}
       </div>

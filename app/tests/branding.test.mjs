@@ -21,16 +21,16 @@ test('BetterBUCT public identity is release-aligned', async () => {
   const gradle = await read('android/app/build.gradle');
 
   assert.equal(APP_NAME, 'BetterBUCT');
-  assert.equal(APP_VERSION, '0.2.25');
-  assert.equal(APP_VERSION_LABEL, '0.2.25-mobile');
+  assert.equal(APP_VERSION, '0.2.26');
+  assert.equal(APP_VERSION_LABEL, '0.2.26-mobile');
   assert.equal(pkg.name, 'betterbuct-mobile-root');
   assert.equal(appPkg.name, 'betterbuct-mobile');
   assert.equal(appPkg.version, APP_VERSION);
   assert.match(capacitor, /appName:\s*['"]BetterBUCT['"]/);
   assert.match(strings, /<string name="app_name">BetterBUCT<\/string>/);
   assert.match(strings, /<string name="title_activity_main">BetterBUCT<\/string>/);
-  assert.match(gradle, /versionCode\s+25/);
-  assert.match(gradle, /versionName\s+"0\.2\.25"/);
+  assert.match(gradle, /versionCode\s+26/);
+  assert.match(gradle, /versionName\s+"0\.2\.26"/);
 });
 
 test('BetterBUCT icon branding survives exported calendar/feed payloads', () => {
@@ -50,4 +50,19 @@ test('BetterBUCT icon branding survives exported calendar/feed payloads', () => 
   assert.equal(feed.producer.version, APP_VERSION_LABEL);
   // The schema/IDs intentionally remain legacy-compatible for old imports.
   assert.equal(feed.schema, 'theia-campus-feed/v1');
+});
+
+test('About page uses the real BetterBUCT and Windows THEIA repositories', async () => {
+  const about = await read('src/views/settings/AboutSettings.tsx');
+  const sidebar = await read('src/layout/AppSidebar.tsx');
+  const updates = await read('src/mobile/update-checker.ts');
+  const privacy = await read('src/assets/privacy.html');
+
+  assert.match(about, /https:\/\/github\.com\/bakahuiii\/BetterBUCT/);
+  assert.match(about, /https:\/\/github\.com\/bakahuiii\/THEIA/);
+  assert.match(about, /<strong id="about-theia-title">THEIA<\/strong>/);
+  assert.match(updates, /https:\/\/api\.github\.com\/repos\/bakahuiii\/BetterBUCT\/releases\/latest/);
+  assert.match(privacy, /https:\/\/github\.com\/bakahuiii\/BetterBUCT\/issues/);
+  assert.doesNotMatch(about, /Θεία|THEIA-Android|COS \/ GitHub/);
+  assert.doesNotMatch(sidebar, /Θεία/);
 });

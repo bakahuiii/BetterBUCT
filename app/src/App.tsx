@@ -27,7 +27,9 @@ import { TooltipProvider } from "./components/ui/tooltip";
 
 export default function App() {
   const app = useTheiaApp();
-  const updateStatus = useGithubUpdateStatus();
+  // The shell is the single owner of the startup update check. Settings views
+  // subscribe to the same bridge state instead of issuing another request.
+  const updateStatus = useGithubUpdateStatus(app.state?.appVersion || "web", { autoCheck: isMobile });
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
   useAppearance(); // apply stored dark/light mode on mount
   // Notification settings now live inside the Tools surface. Migrate older

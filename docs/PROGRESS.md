@@ -28,6 +28,7 @@
 - [x] 北化在线THEOL作业/在线测试列表、截止时间与展开查看详情（只读）
 - [x] 校历、培养计划、空闲教室、场馆状态
 - [x] 手动同步、可选后台同步、同步通知
+- [x] GitHub Release 自动检查、APK 流式下载、安装权限引导和系统安装器更新
 
 ### 明确不做
 
@@ -71,7 +72,7 @@
 - `npm run check`：通过；类型检查、43 项 Node 测试和 Vite 生产构建全部通过
 - `npm run android:build`：通过；debug APK 生成
 - `npm run android:release` / `gradlew.bat assembleRelease`：通过；无私有签名配置时明确生成未签名 Release APK
-- `aapt2 dump badging`：确认 package `io.github.bakahuiii.theia.mobile`、`BetterBUCT`、`versionCode 25`、`versionName 0.2.25`
+- `aapt2 dump badging`：确认 package `io.github.bakahuiii.theia.mobile`、`BetterBUCT`、`versionCode 26`、`versionName 0.2.26`
 - `apksigner verify`：正式 Release APK 的 v1/v2 签名验证通过
 - Android 设备安装验收：本轮执行时 ADB 未发现可用设备，因此未将安装、启动和真实登录结果写成已完成
 - 本轮未把真实校园账号登录、Keystore 密码读写、通知到达和不同 Android 真机网络环境宣称为已验收；Node 测试覆盖了线上登录页、公钥、RSA、Cookie、重定向白名单和缓存保留边界，仍需发布前在真实设备上复测。

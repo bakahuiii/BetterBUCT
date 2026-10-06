@@ -1,12 +1,12 @@
-import { AlertCircle, Braces, CheckCircle2, CircleHelp, Database, Download, ExternalLink, Github, Hash, HeartHandshake, LoaderCircle, Mail, MessagesSquare, RotateCw, ShieldCheck, Smartphone } from "lucide-react";
+import { AlertCircle, Braces, CheckCircle2, CircleHelp, Database, Download, ExternalLink, Github, Hash, HeartHandshake, LoaderCircle, Mail, MessagesSquare, Monitor, RotateCw, ShieldCheck } from "lucide-react";
 import { bridge, isMobile } from "../../bridge";
 import { useGithubUpdateStatus } from "../../hooks/useGithubUpdateStatus";
 import authorAvatar from "../../assets/bakahuiii-avatar.jpg";
 import theiaMark from "../../assets/theia-mark.png";
 import type { ApiStatus, CampusState, GithubUpdateStatus } from "../../types";
 
-const PROJECT_URL = "https://github.com/bakahuiii/THEIA";
-const ANDROID_PROJECT_URL = "https://github.com/bakahuiii/THEIA-Android";
+const PROJECT_URL = "https://github.com/bakahuiii/BetterBUCT";
+const WINDOWS_PROJECT_URL = "https://github.com/bakahuiii/THEIA";
 const RELEASES_URL = `${PROJECT_URL}/releases`;
 
 function formatUpdateTime(value: string | null) {
@@ -30,8 +30,8 @@ function formatUpdateBytes(value: number) {
 }
 
 function describeUpdate(status: GithubUpdateStatus, mobile = false) {
-  if (!status.supported) return mobile ? "移动端可在发行页手动下载更新。" : "仅正式 Windows 安装包支持 COS / GitHub 自动更新。";
-  if (status.state === "checking") return "正在检查 COS / GitHub 更新服务。";
+  if (!status.supported) return mobile ? "移动端可在 GitHub 发行页手动下载更新。" : "仅移动端正式安装包支持 GitHub 自动更新。";
+  if (status.state === "checking") return "正在连接 GitHub 更新服务。";
   if (status.state === "available") {
     return "发现新版本 " + (status.availableVersion || "未知版本") + "，准备下载。";
   }
@@ -41,9 +41,10 @@ function describeUpdate(status: GithubUpdateStatus, mobile = false) {
   }
   if (status.state === "downloaded") {
     return mobile
-      ? "已打开下载页，请下载安装包后按系统提示完成安装。"
+      ? "更新包已下载，点击安装更新并按系统提示确认。"
       : "更新 " + (status.availableVersion || "") + " 已下载，重启即可安装。";
   }
+  if (status.installPermissionRequired) return "已打开系统设置，请允许 BetterBUCT 安装应用，然后再次点击安装更新。";
   if (status.state === "error") return "检查更新失败：" + (status.error || "未知错误");
   if (status.state === "not-available") return "当前已是最新版本 " + status.currentVersion + "。";
   return "当前版本 " + status.currentVersion;
@@ -67,6 +68,8 @@ export function AboutSettings({
   apiBase: string;
   apiStatus: ApiStatus;
 }) {
+  // App.tsx performs the single startup check; this page only observes its
+  // status and keeps the explicit manual check action available.
   const updateStatus = useGithubUpdateStatus(state.appVersion || "web");
 
   const apiOnline = Boolean(apiStatus.baseUrl && apiStatus.host && apiStatus.port > 0);
@@ -78,17 +81,20 @@ export function AboutSettings({
     ? Math.max(0, Math.min(100, updateStatus.progress?.percent || 0))
     : 0;
   const updateSize = updateStatus.updateSizeBytes || updateStatus.progress?.totalBytes || 0;
-  const canInstall = !isMobile && updateStatus.supported && updateStatus.state === "downloaded";
-  const primaryLabel = !updateStatus.supported
+  const canInstall = updateStatus.supported && updateStatus.state === "downloaded";
+  const installPermissionRequired = Boolean(updateStatus.installPermissionRequired);
+  const primaryLabel = installPermissionRequired
+    ? "打开安装权限设置"
+    : !updateStatus.supported
     ? "仅安装包可用"
     : canInstall
-      ? "重启并安装更新"
+      ? (isMobile ? "安装更新" : "重启并安装更新")
       : updateStatus.state === "checking"
         ? "检查中"
         : updateAvailable
-          ? (isMobile ? "打开下载页" : "更新")
+          ? (isMobile ? "下载更新" : "更新")
           : isMobile && updateStatus.state === "downloaded"
-            ? "重新打开下载页"
+            ? "安装更新"
             : downloading
               ? "下载中"
               : "检查更新";
@@ -113,7 +119,7 @@ export function AboutSettings({
 
   const runUpdateAction = async () => {
     if (!updateStatus.supported || updateInProgress) return;
-    if (canInstall) {
+    if (canInstall || installPermissionRequired) {
       await bridge.installUpdate();
       return;
     }
@@ -138,7 +144,7 @@ export function AboutSettings({
             <img src={theiaMark} alt="BetterBUCT" />
           </div>
           <div>
-            <span>Θεία</span>
+            <span>校园信息工作台</span>
             <h2>BetterBUCT</h2>
           </div>
         </div>
@@ -196,7 +202,7 @@ export function AboutSettings({
           <UpdateIcon size={17} className={updateInProgress ? "spinning" : undefined} />
         </div>
         <div className="about-update-copy">
-          <strong>COS / GitHub 自动更新</strong>
+          <strong>GitHub 自动更新</strong>
           <small>{describeUpdate(updateStatus, isMobile)}</small>
           <span>当前版本：BetterBUCT {updateStatus.currentVersion || state.appVersion || "开发版本"}</span>
           <span>上次检查：{formatUpdateTime(updateStatus.lastCheckedAt)}</span>
@@ -223,7 +229,7 @@ export function AboutSettings({
         <div className="about-update-actions">
           <button
             type="button"
-            className={canInstall ? "primary-button" : "secondary-button"}
+            className={canInstall || installPermissionRequired ? "primary-button" : "secondary-button"}
             onClick={() => void runUpdateAction()}
             disabled={!updateStatus.supported || updateInProgress}
           >
@@ -233,27 +239,27 @@ export function AboutSettings({
         </div>
       </div>
 
-      <section className="about-android" aria-labelledby="about-android-title">
-        <div className="about-android-icon" aria-hidden="true">
-          <Smartphone size={19} aria-hidden="true" />
+      <section className="about-theia" aria-labelledby="about-theia-title">
+        <div className="about-theia-icon" aria-hidden="true">
+          <Monitor size={19} aria-hidden="true" />
         </div>
-        <div className="about-android-copy">
-          <div className="about-android-heading">
-            <strong id="about-android-title">BetterBUCT-Android</strong>
-            <span>Android 10+</span>
+        <div className="about-theia-copy">
+          <div className="about-theia-heading">
+            <strong id="about-theia-title">THEIA</strong>
+            <span>Windows</span>
           </div>
-          <p>独立的 Capacitor Android 客户端，提供课表、成绩、考试、作业、学业进度、地图和公开场馆查询。</p>
-          <small>只读校园数据，不执行选课、申请、上传、预约等学校侧操作。</small>
+          <p>独立的 Windows 校园工作台项目，提供本地数据同步、课表、成绩、课程资源和学习工具。</p>
+          <small>项目源码、发行版本和问题反馈均在 GitHub 管理。</small>
         </div>
         <a
-          className="secondary-button about-android-link"
-          href={ANDROID_PROJECT_URL}
+          className="secondary-button about-theia-link"
+          href={WINDOWS_PROJECT_URL}
           target="_blank"
           rel="noreferrer"
-          title="打开 BetterBUCT-Android 项目"
+          title="打开 THEIA Windows 项目"
         >
           <ExternalLink size={15} aria-hidden="true" />
-          查看 Android 项目
+          查看 Windows 项目
         </a>
       </section>
 

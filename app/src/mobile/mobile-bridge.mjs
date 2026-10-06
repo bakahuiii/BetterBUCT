@@ -11,6 +11,7 @@ import { cacheMotionVenueCatalog, cacheMotionVenueStatus } from '../../core/data
 import { APP_VERSION_LABEL } from './app-identity.mjs';
 import { NETWORK_TIMEOUTS, timeoutMs as timeoutMilliseconds } from '../../core/network-config.mjs';
 import { checkForMobileUpdate, openMobileUpdateUrl } from './update-checker.ts';
+import { TheiaUpdate } from './update-plugin.ts';
 
 const JWGLXT_HOME = 'https://jwglxt.buct.edu.cn/jwglxt/xtgl/index_initMenu.html';
 const THEOL_MOBILE_BASE = 'http://course.buct.edu.cn/mobile/';
@@ -54,6 +55,7 @@ function mobileUpdateIdleStatus(currentVersion) {
   return {
     supported: true,
     state: 'idle',
+    installPermissionRequired: false,
     currentVersion: String(currentVersion || 'mobile'),
     availableVersion: null,
     releaseName: null,
@@ -62,6 +64,9 @@ function mobileUpdateIdleStatus(currentVersion) {
     progress: null,
     updateSizeBytes: null,
     error: null,
+    downloadUrl: null,
+    assetName: null,
+    releaseUrl: null,
   };
 }
 
@@ -69,6 +74,7 @@ function mobileUpdateStatusFromInfo(info, checkedAt = new Date().toISOString()) 
   return {
     supported: true,
     state: info.hasUpdate ? 'available' : 'not-available',
+    installPermissionRequired: false,
     currentVersion: info.currentVersion,
     availableVersion: info.hasUpdate ? info.latestVersion : null,
     releaseName: info.releaseName || null,
@@ -78,6 +84,8 @@ function mobileUpdateStatusFromInfo(info, checkedAt = new Date().toISOString()) 
     updateSizeBytes: info.assetSizeBytes || null,
     error: null,
     downloadUrl: info.downloadUrl,
+    assetName: info.assetName || null,
+    releaseUrl: info.releaseUrl || null,
   };
 }
 
@@ -277,6 +285,7 @@ export class MobileBridge {
     this._initialized = false;
     this._initPromise = null;
     this._mobileUpdateStatus = null;
+    this._mobileUpdatePath = null;
   }
 
   async init() {
@@ -1902,6 +1911,7 @@ export class MobileBridge {
     return {
       supported: false,
       state: 'unsupported',
+      installPermissionRequired: false,
       currentVersion: this._state?.appVersion || 'mobile',
       availableVersion: null,
       releaseName: null,
@@ -1936,14 +1946,105 @@ export class MobileBridge {
     const status = this._mobileUpdateStatus || mobileUpdateIdleStatus(this._state?.appVersion);
     const url = status.downloadUrl;
     if (!url) return structuredClone(status);
-    const opened = openMobileUpdateUrl(url);
-    this._mobileUpdateStatus = { ...status, state: opened ? 'downloaded' : 'error', error: opened ? null : '无法打开更新下载页' };
+    if (!this._native) {
+      const opened = openMobileUpdateUrl(url);
+      // A browser preview cannot own the APK file or launch Android's
+      // installer. Keep the update available instead of claiming it was
+      // downloaded, and make the fallback explicit in the status message.
+      this._mobileUpdateStatus = {
+        ...status,
+        state: opened ? 'available' : 'error',
+        error: opened ? '已打开 GitHub 下载页，请在浏览器中完成下载和安装' : '无法打开更新下载页',
+      };
+      this.events.emit('update-status', structuredClone(this._mobileUpdateStatus));
+      return structuredClone(this._mobileUpdateStatus);
+    }
+
+    this._mobileUpdateStatus = {
+      ...status,
+      state: 'downloading',
+      error: null,
+      progress: {
+        percent: 0,
+        transferredBytes: 0,
+        totalBytes: status.updateSizeBytes || 0,
+        bytesPerSecond: 0,
+      },
+    };
+    this.events.emit('update-status', structuredClone(this._mobileUpdateStatus));
+
+    let progressHandle = null;
+    try {
+      progressHandle = await TheiaUpdate.addListener('downloadProgress', (progress) => {
+        const totalBytes = Number(progress?.totalBytes) || this._mobileUpdateStatus?.updateSizeBytes || 0;
+        const transferredBytes = Number(progress?.transferredBytes) || 0;
+        const percent = totalBytes > 0
+          ? Math.max(0, Math.min(100, Number(progress?.percent) || transferredBytes * 100 / totalBytes))
+          : 0;
+        this._mobileUpdateStatus = {
+          ...this._mobileUpdateStatus,
+          state: 'downloading',
+          progress: {
+            percent,
+            transferredBytes,
+            totalBytes,
+            bytesPerSecond: Number(progress?.bytesPerSecond) || 0,
+          },
+        };
+        this.events.emit('update-status', structuredClone(this._mobileUpdateStatus));
+      });
+      const result = await TheiaUpdate.downloadApk({ url, fileName: status.assetName || undefined });
+      this._mobileUpdatePath = String(result?.path || '');
+      const bytes = Number(result?.bytes) || status.updateSizeBytes || 0;
+      this._mobileUpdateStatus = {
+        ...this._mobileUpdateStatus,
+        state: 'downloaded',
+        progress: { percent: 100, transferredBytes: bytes, totalBytes: bytes, bytesPerSecond: this._mobileUpdateStatus.progress?.bytesPerSecond || 0 },
+        updateSizeBytes: bytes || this._mobileUpdateStatus.updateSizeBytes,
+        error: null,
+      };
+    } catch (error) {
+      this._mobileUpdateStatus = {
+        ...this._mobileUpdateStatus,
+        state: 'error',
+        error: error instanceof Error ? error.message : '更新下载失败，请稍后重试',
+      };
+    } finally {
+      try { await progressHandle?.remove?.(); } catch { /* listener cleanup is best-effort */ }
+    }
     this.events.emit('update-status', structuredClone(this._mobileUpdateStatus));
     return structuredClone(this._mobileUpdateStatus);
   }
 
   async skipUpdateVersion() { return this.getUpdateStatus(); }
-  async installUpdate() { return this.downloadUpdate(); }
+  async installUpdate() {
+    await this.init();
+    const status = this._mobileUpdateStatus || mobileUpdateIdleStatus(this._state?.appVersion);
+    if (!this._native) {
+      const opened = status.downloadUrl ? openMobileUpdateUrl(status.downloadUrl) : false;
+      this._mobileUpdateStatus = { ...status, state: opened ? 'available' : 'error', error: opened ? '已打开 GitHub 下载页，请在浏览器中完成下载和安装' : '无法打开更新下载页' };
+    } else {
+      try {
+        const result = await TheiaUpdate.installApk({ path: this._mobileUpdatePath || undefined });
+        if (result?.requiresUnknownSourcesPermission) {
+          this._mobileUpdateStatus = {
+            ...status,
+            state: 'error',
+            installPermissionRequired: true,
+            error: '请在系统设置中允许 BetterBUCT 安装应用，然后再次点击安装更新',
+          };
+        } else if (result?.opened) {
+          this._mobileUpdateStatus = { ...status, state: 'downloaded', installPermissionRequired: false, error: null };
+        } else {
+          this._mobileUpdateStatus = { ...status, state: 'error', installPermissionRequired: false, error: '无法打开系统安装器' };
+        }
+      } catch (error) {
+        this._mobileUpdateStatus = { ...status, state: 'error', installPermissionRequired: false, error: error instanceof Error ? error.message : '无法打开系统安装器' };
+      }
+    }
+    this.events.emit('update-status', structuredClone(this._mobileUpdateStatus));
+    return structuredClone(this._mobileUpdateStatus);
+  }
 
   async getApiStatus() {
     return {

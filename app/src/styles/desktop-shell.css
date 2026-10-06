@@ -1125,7 +1125,7 @@ input,
   white-space: nowrap;
 }
 
-.about-android {
+.about-theia {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -1137,7 +1137,7 @@ input,
   border-radius: 14px;
 }
 
-.about-android-icon {
+.about-theia-icon {
   width: 34px;
   height: 34px;
   display: grid;
@@ -1148,32 +1148,32 @@ input,
   border-radius: 10px;
 }
 
-.about-android-copy {
+.about-theia-copy {
   min-width: 0;
   display: grid;
   gap: 4px;
 }
 
-.about-android-heading {
+.about-theia-heading {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 7px;
 }
 
-.about-android-heading strong {
+.about-theia-heading strong {
   color: var(--foreground);
   font-size: 11px;
 }
 
-.about-android-heading span {
+.about-theia-heading span {
   color: var(--primary);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
 
-.about-android-copy p,
-.about-android-copy small {
+.about-theia-copy p,
+.about-theia-copy small {
   margin: 0;
   color: var(--muted-foreground);
   font-size: 10px;
@@ -1181,7 +1181,7 @@ input,
   overflow-wrap: anywhere;
 }
 
-.about-android-link {
+.about-theia-link {
   flex: 0 0 auto;
   white-space: nowrap;
   text-decoration: none;
@@ -1209,11 +1209,11 @@ input,
     align-items: flex-start;
   }
 
-  .about-android {
+  .about-theia {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .about-android-link {
+  .about-theia-link {
     grid-column: 2;
     justify-self: start;
   }

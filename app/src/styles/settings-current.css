@@ -10,7 +10,7 @@
   .dashboard-advisor-icon,
   .github-update-indicator-icon,
   .about-update-icon,
-  .about-android-icon,
+    .about-theia-icon,
   .interface-runtime-status-icon,
   .quick-action-icon
 ) {
@@ -544,7 +544,7 @@ html[data-app-background="image"] .about-brand-row > .about-me {
   .dashboard-advisor-icon,
   .github-update-indicator-icon,
   .about-update-icon,
-  .about-android-icon,
+  .about-theia-icon,
   .interface-runtime-status-icon,
   .quick-action-icon,
   .notice-source,
