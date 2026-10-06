@@ -83,7 +83,7 @@ public class TheiaUpdatePlugin extends Plugin {
                 String location = connection.getHeaderField("Location");
                 if (location == null || location.trim().isEmpty()) throw new IOException("redirect missing location");
                 URL redirected = new URL(url, location);
-                if (!isAllowedDownloadUrl(redirected.toString())) throw new IOException("redirect target is not allowed");
+                if (!isAllowedRedirectUrl(redirected.toString())) throw new IOException("redirect target is not allowed");
                 connection.disconnect();
                 connection = null;
                 url = redirected;
@@ -255,6 +255,16 @@ public class TheiaUpdatePlugin extends Plugin {
                     && ("github.com".equals(host) || "www.github.com".equals(host)
                     || host.endsWith(".githubusercontent.com"))
                     && path.endsWith(".apk");
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isAllowedRedirectUrl(String rawUrl) {
+        try {
+            URL url = new URL(String.valueOf(rawUrl));
+            return "https".equalsIgnoreCase(url.getProtocol())
+                    && "release-assets.githubusercontent.com".equalsIgnoreCase(url.getHost());
         } catch (Exception ignored) {
             return false;
         }
