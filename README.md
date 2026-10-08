@@ -280,11 +280,6 @@ npm run dev
 
 请勿在公开 Issue 中报告安全漏洞。使用 [GitHub 私密安全通告](https://github.com/bakahuiii/BetterBUCT/security/advisories/new)提交。
 
-### 提交规范
-
-- **删除敏感信息**：提交日志或截图前，请删除学号、密码、Cookie、课程详情和其他个人信息
-- **使用模板**：使用 Issue 模板提供完整信息
-- **一事一议**：每个 Issue 只讨论一个问题
 
 ---
 
@@ -341,15 +336,11 @@ SOFTWARE.
 
 ## 🙏 致谢
 
-- 北京化工大学提供的教务系统和北化在线平台
-- 所有贡献者和用户的支持和反馈
-- [Capacitor](https://capacitorjs.com/) Android 容器框架
-- [React](https://react.dev/) 用户界面库
-- [Tailwind CSS](https://tailwindcss.com/) 样式框架
+- 我自己。
 
 ---
 
-## 📞 联系方式
+## 📞 FINDME
 
 - **GitHub Issues**: [https://github.com/bakahuiii/BetterBUCT/issues](https://github.com/bakahuiii/BetterBUCT/issues)
 - **项目主页**: [https://github.com/bakahuiii/BetterBUCT](https://github.com/bakahuiii/BetterBUCT)
