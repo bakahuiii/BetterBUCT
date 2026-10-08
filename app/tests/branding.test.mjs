@@ -21,16 +21,16 @@ test('BetterBUCT public identity is release-aligned', async () => {
   const gradle = await read('android/app/build.gradle');
 
   assert.equal(APP_NAME, 'BetterBUCT');
-  assert.equal(APP_VERSION, '0.2.27');
-  assert.equal(APP_VERSION_LABEL, '0.2.27-mobile');
+  assert.equal(APP_VERSION, '0.2.28');
+  assert.equal(APP_VERSION_LABEL, '0.2.28-mobile');
   assert.equal(pkg.name, 'betterbuct-mobile-root');
   assert.equal(appPkg.name, 'betterbuct-mobile');
   assert.equal(appPkg.version, APP_VERSION);
   assert.match(capacitor, /appName:\s*['"]BetterBUCT['"]/);
   assert.match(strings, /<string name="app_name">BetterBUCT<\/string>/);
   assert.match(strings, /<string name="title_activity_main">BetterBUCT<\/string>/);
-  assert.match(gradle, /versionCode\s+27/);
-  assert.match(gradle, /versionName\s+"0\.2\.27"/);
+  assert.match(gradle, /versionCode\s+28/);
+  assert.match(gradle, /versionName\s+"0\.2\.28"/);
 });
 
 test('BetterBUCT icon branding survives exported calendar/feed payloads', () => {
