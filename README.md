@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-7.0%2B-green)](https://github.com/bakahuiii/BetterBUCT/releases/latest)
 
-[下载应用](#下载) • [功能说明](#功能特性) • [隐私政策](PRIVACY.md) • [开发文档](docs/README.md)
+[下载应用](#下载) • [功能说明](#功能特性) • [隐私政策](docs/PRIVACY.md) • [开发文档](docs/README.md)
 
 </div>
 
@@ -102,7 +102,7 @@ Android 版本目前不开放以下功能：
 
 ### 最新稳定版本
 
-**v0.2.28** (2024-10-08)
+**v0.2.28** (2026-10-08)
 
 - [GitHub Release 页面](https://github.com/bakahuiii/BetterBUCT/releases/tag/v0.2.28)
 - [下载 Android APK](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.28/BetterBUCT-Android-0.2.28-release.apk) (4.2 MB)
@@ -164,7 +164,7 @@ Android 版本目前不开放以下功能：
 
 **不申请**：相机、麦克风、联系人、短信、电话、定位等权限。
 
-完整隐私政策见 [PRIVACY.md](PRIVACY.md)。
+完整隐私政策见 [PRIVACY.md](docs/PRIVACY.md)。
 
 ---
 
@@ -261,10 +261,10 @@ npm run dev
 - [💻 开发指南](docs/DEVELOPMENT.md) - 环境搭建和开发流程
 - [🚀 发布指南](docs/RELEASE.md) - 构建、签名和发布流程
 - [✅ 实施状态](docs/PROGRESS.md) - 功能完成度和验收记录
-- [🔒 隐私政策](PRIVACY.md) - 数据处理和隐私保护
-- [🤝 贡献指南](CONTRIBUTING.md) - 如何参与贡献
-- [🔐 安全政策](SECURITY.md) - 安全漏洞报告流程
-- [📜 行为准则](CODE_OF_CONDUCT.md) - 社区行为规范
+- [🔒 隐私政策](docs/PRIVACY.md) - 数据处理和隐私保护
+- [🤝 贡献指南](docs/CONTRIBUTING.md) - 如何参与贡献
+- [🔐 安全政策](docs/SECURITY.md) - 安全漏洞报告流程
+- [📜 行为准则](docs/CODE_OF_CONDUCT.md) - 社区行为规范
 
 ---
 
@@ -302,8 +302,8 @@ npm run dev
 
 ### 贡献准则
 
-- 遵守 [行为准则](CODE_OF_CONDUCT.md)
-- 阅读 [贡献指南](CONTRIBUTING.md)
+- 遵守 [行为准则](docs/CODE_OF_CONDUCT.md)
+- 阅读 [贡献指南](docs/CONTRIBUTING.md)
 - 运行 `npm run check` 确保所有测试通过
 - 提交前删除敏感信息和签名密钥
 

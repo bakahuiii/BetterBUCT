@@ -99,4 +99,4 @@ adb install -r app\android\app\build\outputs\apk\debug\app-debug.apk
 
 ### 登录失败后如何提交日志
 
-只提交脱敏后的错误类型、时间、Android 版本和应用版本。删除学号、密码、Cookie、完整 URL 查询参数、课程详情和导出文件；凭据泄露请按 [安全政策](../SECURITY.md) 私下报告。
+只提交脱敏后的错误类型、时间、Android 版本和应用版本。删除学号、密码、Cookie、完整 URL 查询参数、课程详情和导出文件；凭据泄露请按 [安全政策](SECURITY.md) 私下报告。

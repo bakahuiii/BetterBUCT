@@ -44,10 +44,10 @@ npm run android:release
 app/android/app/build/outputs/apk/release/app-release.apk
 ```
 
-发布前将 APK 重命名为统一的产品和版本格式，例如 `BetterBUCT-Android-0.2.27-release.apk`，再生成同名 `.sha256` 文件。PowerShell 示例：
+发布前将 APK 重命名为统一的产品和版本格式，例如 `BetterBUCT-Android-0.2.28-release.apk`，再生成同名 `.sha256` 文件。PowerShell 示例：
 
 ```powershell
-$apk = 'release\BetterBUCT-Android-0.2.27-release.apk'
+$apk = 'release\BetterBUCT-Android-0.2.28-release.apk'
 Get-FileHash $apk -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($apk))" } | Set-Content "$apk.sha256" -Encoding utf8
 ```
 
@@ -56,12 +56,12 @@ Get-FileHash $apk -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(
 使用 Android SDK 中与当前 SDK 匹配的工具检查包名和版本：
 
 ```powershell
-aapt2 dump badging release\BetterBUCT-Android-0.2.27-release.apk | Select-String 'package:|application-label:'
-apksigner verify --verbose release\BetterBUCT-Android-0.2.27-release.apk
-Get-FileHash release\BetterBUCT-Android-0.2.27-release.apk -Algorithm SHA256
+aapt2 dump badging release\BetterBUCT-Android-0.2.28-release.apk | Select-String 'package:|application-label:'
+apksigner verify --verbose release\BetterBUCT-Android-0.2.28-release.apk
+Get-FileHash release\BetterBUCT-Android-0.2.28-release.apk -Algorithm SHA256
 ```
 
-期望看到 `io.github.bakahuiii.theia.mobile`、`BetterBUCT`、`versionCode 27` 和 `versionName 0.2.27`；签名包应通过 `apksigner verify`。将本地哈希与上传到 GitHub Release 的 `.sha256` 附件读回比较。
+期望看到 `io.github.bakahuiii.theia.mobile`、`BetterBUCT`、`versionCode 28` 和 `versionName 0.2.28`；签名包应通过 `apksigner verify`。将本地哈希与上传到 GitHub Release 的 `.sha256` 附件读回比较。
 
 ## GitHub Release
 

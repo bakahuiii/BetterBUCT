@@ -335,7 +335,7 @@ BetterBUCT 处理教务凭据、北化在线凭据和校园数据。本政策说
 ## 🔗 相关资源
 
 - [隐私政策](PRIVACY.md) - 数据处理和隐私保护
-- [架构说明](docs/ARCHITECTURE.md) - 安全设计和边界
+- [架构说明](ARCHITECTURE.md) - 安全设计和边界
 - [贡献指南](CONTRIBUTING.md) - 代码安全准则
 - [OWASP Mobile Top 10](https://owasp.org/www-project-mobile-top-10/) - 移动安全参考
 

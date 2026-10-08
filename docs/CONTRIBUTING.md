@@ -37,8 +37,8 @@
 ### 必读文档
 
 1. [README.md](README.md) - 项目介绍和功能说明
-2. [开发指南](docs/DEVELOPMENT.md) - 环境搭建和开发流程
-3. [架构说明](docs/ARCHITECTURE.md) - 技术架构和设计
+2. [开发指南](DEVELOPMENT.md) - 环境搭建和开发流程
+3. [架构说明](ARCHITECTURE.md) - 技术架构和设计
 4. [行为准则](CODE_OF_CONDUCT.md) - 社区行为规范
 5. [安全政策](SECURITY.md) - 安全问题报告流程
 
@@ -47,7 +47,7 @@
 在提交新的 Issue 或 PR 之前：
 
 - 🔍 搜索现有 Issues，避免重复
-- 📖 查看 [实施状态](docs/PROGRESS.md) 了解已实现和明确不做的功能
+- 📖 查看 [实施状态](PROGRESS.md) 了解已实现和明确不做的功能
 - 💬 在 Issue 中讨论重大功能，获得反馈后再开始编码
 
 ---
@@ -88,7 +88,7 @@ npm run check
 # ✓ Vite 构建成功
 ```
 
-详细环境搭建见 [开发指南](docs/DEVELOPMENT.md)。
+详细环境搭建见 [开发指南](DEVELOPMENT.md)。
 
 ---
 
@@ -300,7 +300,7 @@ BetterBUCT/
 ├── docs/                      # 文档
 ├── plugins/                   # 插件接口定义
 ├── README.md                  # 项目说明
-├── PRIVACY.md                 # 隐私政策
+├── docs/PRIVACY.md            # 隐私政策
 ├── LICENSE                    # MIT 许可证
 └── package.json               # 根配置
 ```
@@ -477,7 +477,7 @@ public class TheiaVaultPlugin extends Plugin {
    - 未经测试的代码
    - 包含硬编码路径的代码
 
-详见 [实施状态](docs/PROGRESS.md) 中的"明确不做"部分。
+详见 [实施状态](PROGRESS.md) 中的"明确不做"部分。
 
 ---
 
@@ -503,7 +503,7 @@ public class TheiaVaultPlugin extends Plugin {
 
 ### 开发问题
 
-- 📖 先查阅 [开发指南](docs/DEVELOPMENT.md) 和 [架构说明](docs/ARCHITECTURE.md)
+- 📖 先查阅 [开发指南](DEVELOPMENT.md) 和 [架构说明](ARCHITECTURE.md)
 - 🔍 搜索现有 Issues
 - 💬 在 Issue 中提问（不要在 PR 中讨论无关问题）
 
@@ -524,7 +524,7 @@ public class TheiaVaultPlugin extends Plugin {
 
 提交贡献即表示同意：
 
-1. 你的贡献将以 [MIT 许可证](LICENSE) 发布
+1. 你的贡献将以 [MIT 许可证](../LICENSE) 发布
 2. 你拥有贡献内容的版权或已获得授权
 3. 你的贡献不侵犯第三方权益
 
