@@ -14,10 +14,8 @@
 
 - `applicationId`: `io.github.bakahuiii.theia.mobile`（为兼容旧版本，暂不改名）
 - 显示名称：`BetterBUCT`
-- `versionCode`: `27`
-- `versionName`: `0.2.27`
-
-当前 `0.2.27` 是仅用于验证自动更新链路的测试包；稳定版仍为 `0.2.26`。测试包虽然使用普通公开 Release 以便 `/releases/latest` 检查接口发现，但不建议普通用户安装。
+- `versionCode`: `28`
+- `versionName`: `0.2.28`
 - 最低 Android API：`23`
 - 编译/目标 API：`35`
 

@@ -6,5 +6,5 @@
  */
 export const APP_NAME = 'BetterBUCT';
 export const LEGACY_APP_NAME = 'THEIA';
-export const APP_VERSION = '0.2.27';
+export const APP_VERSION = '0.2.28';
 export const APP_VERSION_LABEL = `${APP_VERSION}-mobile`;

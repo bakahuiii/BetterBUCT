@@ -1,6 +1,6 @@
 {
   "name": "betterbuct-mobile-root",
-  "version": "0.2.27",
+  "version": "0.2.28",
   "private": true,
   "description": "BetterBUCT Android 根清单 — 供 core/ 模块读取版本号",
   "type": "module"

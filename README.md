@@ -24,13 +24,11 @@ Android 版本目前不开放模型顾问、抢课/抢课哨兵、作业自动�
 - [最新 GitHub Release](https://github.com/bakahuiii/BetterBUCT/releases/latest)
 - [所有发行版本](https://github.com/bakahuiii/BetterBUCT/releases)
 
-当前稳定版本为 `v0.2.26`：
+当前稳定版本为 `v0.2.28`：
 
-- [Release 说明](https://github.com/bakahuiii/BetterBUCT/releases/tag/v0.2.26)
-- [Android APK](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.26/BetterBUCT-Android-0.2.26-release.apk)
-- [APK SHA-256](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.26/BetterBUCT-Android-0.2.26-release.apk.sha256)
-
-`v0.2.27` 仅作为自动更新链路测试包公开发布，不建议普通用户安装。
+- [Release 说明](https://github.com/bakahuiii/BetterBUCT/releases/tag/v0.2.28)
+- [Android APK](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.28/BetterBUCT-Android-0.2.28-release.apk)
+- [APK SHA-256](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.28/BetterBUCT-Android-0.2.28-release.apk.sha256)
 
 发布包通过 GitHub Release 提供，不把 APK、签名密钥或用户数据提交到源代码仓库。安装前请阅读对应 Release 的说明并校验 SHA-256。
 
