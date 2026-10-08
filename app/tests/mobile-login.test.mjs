@@ -427,6 +427,68 @@ test('mobile campus sync persists source domain outcomes for the sync settings p
   assert.equal(result.state.sync.domains.schedule.outcomes.jwglxt.status, 'succeeded');
 });
 
+test('grade-details retry logs in without a full sync and reads only that JWGLXT domain', async () => {
+  const jwglxtDomains = [];
+  let clientLogins = 0;
+  let theolSyncCalls = 0;
+  const bridge = new MobileBridge({
+    storageBackend: createWebStorageBackend({ storage: createLocalStorageShim() }),
+    vault: createVault(new Map([
+      ['unified-credentials', { username: 'student', password: 'secret' }],
+    ])),
+    session: { clear() {} },
+    webPreview: true,
+    academicClientFactory() {
+      return { async login() { clientLogins += 1; } };
+    },
+    campusSyncFactory() {
+      return {
+        async syncJwglxt(state, { domains }) {
+          jwglxtDomains.push(domains);
+          return {
+            state: {
+              ...state,
+              academicExtras: {
+                ...state.academicExtras,
+                domains: {
+                  ...state.academicExtras.domains,
+                  'grade-details': { capturedAt: '2026-10-07T00:00:00.000Z', records: [] },
+                },
+              },
+              sync: {
+                ...state.sync,
+                lastCompletedAt: '2026-10-07T00:00:00.000Z',
+                lastRunAt: '2026-10-07T00:00:00.000Z',
+                lastSuccessAt: '2026-10-07T00:00:00.000Z',
+                domains: {
+                  ...state.sync.domains,
+                  'grade-details': { status: 'succeeded' },
+                },
+              },
+            },
+            result: { errors: [], source: { connected: true } },
+          };
+        },
+        async syncTheol() { theolSyncCalls += 1; },
+      };
+    },
+  });
+
+  await bridge.init();
+  bridge._state.sync.lastCompletedAt = '2026-10-01T00:00:00.000Z';
+  bridge._state.sync.lastRunAt = '2026-10-01T00:00:00.000Z';
+  bridge._state.sync.lastSuccessAt = '2026-10-01T00:00:00.000Z';
+  const snapshot = await bridge.retrySyncDomain('grade-details');
+
+  assert.equal(clientLogins, 1);
+  assert.deepEqual(jwglxtDomains, [['grade-details']]);
+  assert.equal(theolSyncCalls, 0);
+  assert.equal(snapshot.academicExtras.domains['grade-details'].capturedAt, '2026-10-07T00:00:00.000Z');
+  assert.equal(snapshot.sync.lastCompletedAt, '2026-10-01T00:00:00.000Z');
+  assert.equal(snapshot.sync.lastRunAt, '2026-10-01T00:00:00.000Z');
+  assert.equal(snapshot.sync.lastSuccessAt, '2026-10-01T00:00:00.000Z');
+});
+
 test('preview campus transport keeps canonical URLs while using the same-origin proxy', async () => {
   const requests = [];
   const target = 'https://jwglxt.buct.edu.cn/jwglxt/xtgl/login_slogin.html';

@@ -282,7 +282,7 @@ const webBridge: TheiaBridge = {
   async downloadMailboxAttachment() {
     throw new Error("校园邮箱仅在桌面客户端中可用");
   },
-  async login(_options?: { silent?: boolean; interactive?: boolean }) {
+  async login(_options?: { silent?: boolean; interactive?: boolean; sync?: boolean }) {
     throw new Error("统一身份认证仅在桌面客户端中可用");
   },
   async logout() {

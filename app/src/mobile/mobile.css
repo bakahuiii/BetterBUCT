@@ -273,34 +273,6 @@ html, body {
 .theia-mobile-action-sheet button:disabled { opacity: .5; }
 .spin { animation: theia-spin .8s linear infinite; }
 
-/* 边缘手势刷新：顶部下拉或底部上拉 */
-.theia-pull-to-refresh {
-  display: flex; align-items: center; justify-content: center;
-  height: 0; overflow: hidden;
-  transition: height .2s ease;
-  color: var(--muted-foreground, #687780);
-  font-size: 13px; gap: 8px;
-  background: var(--canvas, #f4f6f8);
-}
-.theia-pull-to-refresh.active { height: 52px; }
-.theia-pull-to-refresh.bottom {
-  position: fixed;
-  right: 0;
-  bottom: calc(var(--theia-safe-bottom, env(safe-area-inset-bottom, 0px)) + 66px);
-  left: 0;
-  z-index: 120;
-  border-top: 1px solid var(--border, #dce4e4);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, .08);
-}
-.theia-pull-to-refresh .spinner {
-  width: 20px; height: 20px;
-  border: 2.5px solid var(--border, #dce4e4);
-  border-top: 2.5px solid var(--primary, #176c64);
-  border-radius: 50%;
-  animation: theia-spin .6s linear infinite;
-}
-@keyframes theia-spin { to { transform: rotate(360deg); } }
-
 /* ═══════════════════════════════════════════════════════════════════
    v4 — 通讯/表格/弹窗的移动端适配
    ═══════════════════════════════════════════════════════════════════ */
@@ -465,8 +437,6 @@ html, body {
   background: #1a2233 !important;
   border-color: #2a3545 !important;
 }
-.dark .theia-pull-to-refresh { background: var(--canvas, #111820); }
-
 /* v5: mobile is a focused app surface, not a compressed desktop canvas. */
 .theia-mobile-tabbar,
 .theia-mobile-actions {
@@ -1612,6 +1582,12 @@ html[data-theia-mobile] [role="button"] {
   html, body { touch-action: pan-y; }
   html, body, #root { height: 100%; }
 
+  /* The mobile client has explicit refresh buttons. Keep edge dragging as
+   * ordinary scrolling and prevent the WebView/browser refresh affordance. */
+  html, body, #root, .app-shell, .app-body, .workspace, .settings-page-shell {
+    overscroll-behavior-y: none !important;
+  }
+
   /* Settings is a normal destination on mobile, not a modal layered over the
    * previous page. Keep the bottom tab bar mounted while the old workspace is
    * removed from hit testing and the scroll tree. */
@@ -1859,13 +1835,11 @@ html[data-theia-mobile] [role="button"] {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    grid-template-columns: 36px minmax(0, 1fr) 36px auto;
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
   }
 
   .week-navigator-current strong { font-size: 14px; }
   .week-navigator-current small { font-size: 8px; }
-  .week-navigator-input { padding-right: 5px; padding-left: 6px; }
-
   .schedule-board {
     grid-template-columns: 54px repeat(7, minmax(0, 1fr)) !important;
     grid-template-rows: 48px repeat(var(--schedule-period-count), minmax(74px, auto)) !important;
@@ -3302,5 +3276,110 @@ html[data-theia-mobile] [role="button"] {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
+  }
+}
+
+@media (max-width: 720px) {
+  .schedule-toolbar {
+    display: flex !important;
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 6px !important;
+    z-index: 100 !important;
+  }
+
+  .schedule-toolbar-main {
+    display: flex !important;
+    flex: 1 0 100% !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  .schedule-heading-copy {
+    flex: 1 1 auto;
+  }
+
+  .schedule-toolbar-main > .schedule-today-button {
+    grid-column: auto !important;
+    width: auto !important;
+    min-width: 38px !important;
+    min-height: 36px !important;
+    justify-content: center !important;
+    padding: 0 8px !important;
+  }
+
+  .schedule-toolbar-main > .schedule-today-button span {
+    display: inline !important;
+  }
+
+  .schedule-controls-trigger {
+    min-height: 36px;
+    gap: 5px;
+    padding: 0 8px;
+  }
+
+  .schedule-controls-panel {
+    position: absolute !important;
+    z-index: 300 !important;
+    top: calc(100% + 8px) !important;
+    right: 0;
+    bottom: auto !important;
+    width: min(360px, calc(100vw - 20px));
+    max-height: calc(100dvh - 150px);
+    overflow-y: auto;
+  }
+
+  .schedule-controls-panel .schedule-layout-switch,
+  .schedule-controls-panel .schedule-range-switch {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-controls-panel .schedule-layout-switch button,
+  .schedule-controls-panel .schedule-range-switch button {
+    min-width: 0 !important;
+    min-height: 34px !important;
+    padding: 0 8px !important;
+  }
+
+  .schedule-week-toolbar {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    justify-content: flex-start !important;
+  }
+
+  .schedule-week-toolbar .week-navigator {
+    width: 100% !important;
+    max-width: 360px;
+    grid-template-columns: 30px minmax(0, 1fr) 30px !important;
+  }
+
+  .schedule-toolbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+  }
+
+  .schedule-toolbar-main {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+    justify-content: flex-end !important;
+  }
+
+  .schedule-toolbar-main > .schedule-today-button {
+    flex: 0 0 auto !important;
+  }
+
+  .schedule-controls-wrap {
+    flex: 0 0 auto !important;
   }
 }

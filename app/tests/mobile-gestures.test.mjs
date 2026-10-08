@@ -1,147 +1,77 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-class FakeClassList {
-  constructor() { this.values = new Set(); }
-  add(...values) { values.forEach((value) => this.values.add(value)); }
-  remove(...values) { values.forEach((value) => this.values.delete(value)); }
-  toggle(value, force) {
-    const next = force === undefined ? !this.values.has(value) : force;
-    if (next) this.values.add(value); else this.values.delete(value);
-    return next;
+test('pull-to-refresh compatibility export never installs a gesture handler', async () => {
+  const listeners = new Map();
+  const element = {
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    removeEventListener(type) { listeners.delete(type); },
+  };
+  const previousDocument = globalThis.document;
+  globalThis.document = { documentElement: element };
+  try {
+    const { installPullToRefresh } = await import('../src/mobile/mobile-gestures.mjs');
+    const cleanup = installPullToRefresh({
+      element,
+      onRefresh: () => { throw new Error('must never be called'); },
+    });
+    assert.equal(typeof cleanup, 'function');
+    assert.equal(listeners.size, 0);
+    cleanup();
+    assert.equal(listeners.size, 0);
+  } finally {
+    globalThis.document = previousDocument;
   }
-  contains(value) { return this.values.has(value); }
-}
+});
 
-class FakeElement {
-  constructor() {
-    this.listeners = new Map();
-    this.style = {};
-    this.classList = new FakeClassList();
-    this.removed = false;
-    this.span = { textContent: '' };
+test('pull-to-refresh blocker blocks only top-edge single-finger downward drags', async () => {
+  const listeners = new Map();
+  const documentRef = {
+    scrollingElement: { scrollTop: 0 },
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    removeEventListener(type) { listeners.delete(type); },
+  };
+  const scroller = {
+    nodeType: 1,
+    parentElement: null,
+    scrollHeight: 300,
+    clientHeight: 100,
+    scrollTop: 0,
+    closest() { return null; },
+  };
+  const previousGetComputedStyle = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = () => ({ overflowY: 'auto' });
+  try {
+    const { installPullToRefreshBlocker } = await import('../src/mobile/mobile-gestures.mjs');
+    const cleanup = installPullToRefreshBlocker(documentRef);
+    const fire = (type, detail) => {
+      let prevented = false;
+      listeners.get(type)({ type, ...detail, preventDefault() { prevented = true; } });
+      return prevented;
+    };
+
+    const touch = (identifier, clientY, clientX = 10) => ({ identifier, clientY, clientX });
+    fire('touchstart', { target: scroller, touches: [touch(1, 10)] });
+    assert.equal(fire('touchmove', { touches: [touch(1, 30)] }), true,
+      'a downward drag at the top is prevented');
+
+    scroller.scrollTop = 20;
+    fire('touchstart', { target: scroller, touches: [touch(2, 10)] });
+    assert.equal(fire('touchmove', { touches: [touch(2, 30)] }), false,
+      'a scroller with content above remains scrollable');
+
+    scroller.scrollTop = 0;
+    fire('touchstart', { target: scroller, touches: [touch(3, 10)] });
+    fire('touchstart', { target: scroller, touches: [touch(3, 10), touch(4, 10, 30)] });
+    assert.equal(fire('touchmove', { touches: [touch(3, 30), touch(4, 30, 30)] }), false,
+      'multi-touch gestures are ignored');
+    assert.equal(fire('touchmove', { touches: [touch(3, 40)] }), false,
+      'the gesture remains ignored after it becomes single-touch again');
+
+    cleanup();
+    assert.equal(listeners.size, 0);
+  } finally {
+    if (previousGetComputedStyle === undefined) delete globalThis.getComputedStyle;
+    else globalThis.getComputedStyle = previousGetComputedStyle;
   }
-  addEventListener(type, listener) { this.listeners.set(type, listener); }
-  removeEventListener(type) { this.listeners.delete(type); }
-  dispatch(type, event = {}) { this.listeners.get(type)?.(event); }
-  querySelector(selector) { return selector === 'span' ? this.span : null; }
-  remove() { this.removed = true; }
-  set innerHTML(_value) {}
-}
-
-const root = new FakeElement();
-const scroller = new FakeElement();
-scroller.scrollTop = 0;
-scroller.scrollHeight = 1_000;
-scroller.clientHeight = 500;
-const settingsScroller = new FakeElement();
-settingsScroller.scrollTop = 0;
-settingsScroller.scrollHeight = 1_200;
-settingsScroller.clientHeight = 0;
-const indicators = [];
-
-globalThis.document = {
-  documentElement: root,
-  body: { prepend(element) { indicators.push(element); } },
-  createElement() { return new FakeElement(); },
-  querySelector(selector) {
-    if (selector === '.settings-mobile-shell') return settingsScroller.clientHeight ? settingsScroller : null;
-    return selector === '.workspace' ? scroller : null;
-  },
-};
-
-const { installPullToRefresh } = await import('../src/mobile/mobile-gestures.mjs');
-
-function touch(clientY, clientX = 20) {
-  return { clientY, clientX };
-}
-
-async function settle() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-test('edge gestures refresh at the top and bottom but not in the middle', async () => {
-  let refreshes = 0;
-  const cleanup = installPullToRefresh({
-    element: root,
-    threshold: 50,
-    onRefresh: async () => { refreshes += 1; },
-  });
-
-  root.dispatch('touchstart', { touches: [touch(100)] });
-  root.dispatch('touchmove', { touches: [touch(160)] });
-  root.dispatch('touchend', { changedTouches: [touch(160)] });
-  await settle();
-  assert.equal(refreshes, 1);
-
-  scroller.scrollTop = 200;
-  root.dispatch('touchstart', { touches: [touch(100)] });
-  root.dispatch('touchmove', { touches: [touch(180)] });
-  root.dispatch('touchend', { changedTouches: [touch(180)] });
-  await settle();
-  assert.equal(refreshes, 1, 'a swipe in the middle remains ordinary scrolling');
-
-  scroller.scrollTop = 500;
-  root.dispatch('touchstart', { touches: [touch(200)] });
-  root.dispatch('touchmove', { touches: [touch(140)] });
-  root.dispatch('touchend', { changedTouches: [touch(140)] });
-  await settle();
-  assert.equal(refreshes, 2, 'pulling upward from the bottom refreshes');
-
-  cleanup();
-  assert.equal(indicators[0].removed, true);
 });
-
-test('refresh indicators are cleared after a synchronous refresh error and touch cancellation', async () => {
-  const cleanup = installPullToRefresh({
-    element: root,
-    threshold: 20,
-    onRefresh: () => { throw new Error('refresh failed'); },
-  });
-
-  scroller.scrollTop = 0;
-  root.dispatch('touchstart', { touches: [touch(100)] });
-  root.dispatch('touchmove', { touches: [touch(130)] });
-  root.dispatch('touchcancel');
-  assert.equal(indicators.at(-1).style.display, 'none');
-
-  root.dispatch('touchstart', { touches: [touch(100)] });
-  root.dispatch('touchmove', { touches: [touch(130)] });
-  root.dispatch('touchend', { changedTouches: [touch(130)] });
-  await settle();
-  assert.equal(indicators.at(-1).style.display, 'none');
-  cleanup();
-});
-
-test('settings page uses its visible scroll owner instead of the hidden workspace', async () => {
-  let refreshes = 0;
-  const cleanup = installPullToRefresh({
-    element: root,
-    threshold: 40,
-    onRefresh: async () => { refreshes += 1; },
-  });
-
-  // Mobile settings hides .workspace and scrolls .settings-mobile-shell. A
-  // normal swipe in the middle of that page must not be mistaken for an edge.
-  scroller.clientHeight = 0;
-  settingsScroller.clientHeight = 600;
-  settingsScroller.scrollTop = 200;
-  const settingsTarget = { closest: () => settingsScroller };
-  root.dispatch('touchstart', { target: settingsTarget, touches: [touch(400)] });
-  root.dispatch('touchmove', { touches: [touch(250)] });
-  root.dispatch('touchend', { changedTouches: [touch(250)] });
-  await settle();
-  assert.equal(refreshes, 0);
-
-  settingsScroller.scrollTop = 600;
-  root.dispatch('touchstart', { target: settingsTarget, touches: [touch(400)] });
-  root.dispatch('touchmove', { touches: [touch(330)] });
-  root.dispatch('touchend', { changedTouches: [touch(330)] });
-  await settle();
-  assert.equal(refreshes, 1, 'the visible settings scroller still refreshes at its bottom edge');
-
-  cleanup();
-  scroller.clientHeight = 500;
-  settingsScroller.clientHeight = 0;
-});
-

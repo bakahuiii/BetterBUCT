@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Download, FolderOpen, Grid3X3, List, MapPin, UserRound, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Grid3X3, List, MapPin, SlidersHorizontal, UserRound, X } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -176,16 +176,10 @@ export function ScheduleView({
   items,
   terms,
   calendar,
-  onExportPdf,
-  onOpenPdfDirectory,
-  exportingPdf,
 }: {
   items: ScheduleItem[];
   terms: Term[];
   calendar?: AcademicCalendar | null;
-  onExportPdf: () => void;
-  onOpenPdfDirectory: () => void;
-  exportingPdf: boolean;
 }) {
   const days = DAY_LABELS;
   const [termFilter, setTermFilter] = useState(
@@ -197,8 +191,10 @@ export function ScheduleView({
   const [weekNum, setWeekNum] = useState(1);
   const [calendarKey, setCalendarKey] = useState<string | null>(null);
   const [todayNotice, setTodayNotice] = useState<string | null>(null);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [popover, setPopover] = useState<SchedulePopover | null>(null);
   const [draggingPopover, setDraggingPopover] = useState(false);
+  const controlsRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const popoverDragRef = useRef<PopoverDragState | null>(null);
 
@@ -276,7 +272,24 @@ export function ScheduleView({
     setWeekMode("week");
     setWeekNum(currentWeek.week);
     setPopover(null);
+    setControlsOpen(false);
   };
+
+  useEffect(() => {
+    if (!controlsOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!controlsRef.current?.contains(event.target as Node)) setControlsOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setControlsOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [controlsOpen]);
 
   useEffect(() => {
     if (!popover) return;
@@ -482,6 +495,15 @@ export function ScheduleView({
         )}
 
       <div className="schedule-toolbar">
+        {weekMode === "week" && (
+          <div className="schedule-week-toolbar">
+            <div className="week-navigator" role="group" aria-label="切换课表周次">
+              <button type="button" className="week-step-button" onClick={() => changeWeek(-1)} disabled={weekNum <= 1} aria-label="上一周" title="上一周（键盘 ←）"><ChevronLeft size={17} aria-hidden="true" /></button>
+              <div className="week-navigator-current"><strong>第 {weekNum} 周</strong><small>{isShowingToday ? "本周 · 今天" : dayDates ? `${dayDates[0]} – ${dayDates[6]}` : "左右切换周次"}</small></div>
+              <button type="button" className="week-step-button" onClick={() => changeWeek(1)} disabled={weekNum >= 30} aria-label="下一周" title="下一周（键盘 →）"><ChevronRight size={17} aria-hidden="true" /></button>
+            </div>
+          </div>
+        )}
         <div className="schedule-toolbar-main">
           <button
             type="button"
@@ -492,118 +514,45 @@ export function ScheduleView({
             <CalendarDays size={16} />
             <span>今日课表</span>
           </button>
-          <TermSelector
-            terms={terms}
-            value={termFilter}
-            onChange={setTermFilter}
-          />
-          <div className="schedule-layout-switch segmented" role="group" aria-label="课表显示方式">
+          <div className="schedule-controls-wrap" ref={controlsRef}>
             <button
               type="button"
-              className={scheduleLayout === "grid" ? "active" : ""}
-              onClick={() => setScheduleLayout("grid")}
-              aria-pressed={scheduleLayout === "grid"}
-              title="网格课表"
+              className="schedule-controls-trigger"
+              onClick={() => setControlsOpen((open) => !open)}
+              aria-expanded={controlsOpen}
+              aria-controls="schedule-controls-panel"
+              aria-label="打开课表设置"
+              title="打开学期、视图和范围设置"
             >
-              <Grid3X3 size={14} aria-hidden="true" />
-              <span>课表</span>
+              <SlidersHorizontal size={16} aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              className={scheduleLayout === "agenda" ? "active" : ""}
-              onClick={() => setScheduleLayout("agenda")}
-              aria-pressed={scheduleLayout === "agenda"}
-              title="完整课程清单"
-            >
-              <List size={14} aria-hidden="true" />
-              <span>清单</span>
-            </button>
+            {controlsOpen && (
+              <section id="schedule-controls-panel" className="schedule-controls-panel" role="dialog" aria-label="课表视图和周次设置">
+                <header className="schedule-controls-panel-header">
+                  <div><strong>课表设置</strong><span>调整学期、显示方式和范围</span></div>
+                  <button type="button" onClick={() => setControlsOpen(false)} aria-label="关闭课表设置"><X size={16} aria-hidden="true" /></button>
+                </header>
+                <div className="schedule-controls-term">
+                  <span>学期</span>
+                  <TermSelector terms={terms} value={termFilter} onChange={setTermFilter} />
+                </div>
+                <div className="schedule-controls-row">
+                  <span>显示方式</span>
+                  <div className="schedule-layout-switch segmented" role="group" aria-label="课表显示方式">
+                    <button type="button" className={scheduleLayout === "grid" ? "active" : ""} onClick={() => setScheduleLayout("grid")} aria-pressed={scheduleLayout === "grid"}><Grid3X3 size={14} aria-hidden="true" /><span>课表</span></button>
+                    <button type="button" className={scheduleLayout === "agenda" ? "active" : ""} onClick={() => setScheduleLayout("agenda")} aria-pressed={scheduleLayout === "agenda"}><List size={14} aria-hidden="true" /><span>清单</span></button>
+                  </div>
+                </div>
+                <div className="schedule-controls-row">
+                  <span>范围</span>
+                  <div className="schedule-range-switch segmented" role="group" aria-label="课表范围">
+                    <button type="button" className={weekMode === "week" ? "active" : ""} onClick={() => setWeekMode("week")}>按周</button>
+                    <button type="button" className={weekMode === "all" ? "active" : ""} onClick={() => setWeekMode("all")}>全学期</button>
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
-          <div className="schedule-range-switch segmented" role="group" aria-label="课表范围">
-            <button
-              className={weekMode === "week" ? "active" : ""}
-              onClick={() => setWeekMode("week")}
-            >
-              按周
-            </button>
-            <button
-              className={weekMode === "all" ? "active" : ""}
-              onClick={() => setWeekMode("all")}
-            >
-              全学期
-            </button>
-          </div>
-          {weekMode === "week" && (
-            <div className="week-navigator" role="group" aria-label="切换课表周次">
-              <button
-                type="button"
-                className="week-step-button"
-                onClick={() => changeWeek(-1)}
-                disabled={weekNum <= 1}
-                aria-label="上一周"
-                title="上一周（键盘 ←）"
-              >
-                <ChevronLeft size={17} aria-hidden="true" />
-              </button>
-              <div className="week-navigator-current">
-                <span>课表周次</span>
-                <strong>第 {weekNum} 周</strong>
-                <small>
-                  {isShowingToday
-                    ? "本周 · 今天"
-                    : dayDates
-                      ? `${dayDates[0]} – ${dayDates[6]}`
-                      : "可输入周次跳转"}
-                </small>
-              </div>
-              <button
-                type="button"
-                className="week-step-button"
-                onClick={() => changeWeek(1)}
-                disabled={weekNum >= 30}
-                aria-label="下一周"
-                title="下一周（键盘 →）"
-              >
-                <ChevronRight size={17} aria-hidden="true" />
-              </button>
-              <label className="week-navigator-input">
-                <span>跳转</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={weekNum}
-                  onChange={(event) => {
-                    const value = Number(event.target.value);
-                    setWeekNum(Number.isFinite(value) ? Math.min(30, Math.max(1, value)) : 1);
-                  }}
-                  aria-label="输入周次"
-                />
-              </label>
-            </div>
-          )}
-        </div>
-        <div className="schedule-toolbar-actions">
-          <button
-            className="secondary-button schedule-pdf-button"
-            onClick={onExportPdf}
-            disabled={exportingPdf}
-            title="调用教务系统原生输出 PDF"
-          >
-            <Download
-              size={17}
-              className={exportingPdf ? "spinning" : undefined}
-            />
-            {exportingPdf ? "正在输出" : "输出 PDF"}
-          </button>
-          <button
-            className="secondary-button schedule-directory-button"
-            onClick={onOpenPdfDirectory}
-            title="打开课表 PDF 所在文件夹"
-          >
-            <FolderOpen size={17} />
-            <span>打开本地文件夹</span>
-          </button>
         </div>
       </div>
 

@@ -15,6 +15,7 @@ import { TheiaUpdate } from './update-plugin.ts';
 
 const JWGLXT_HOME = 'https://jwglxt.buct.edu.cn/jwglxt/xtgl/index_initMenu.html';
 const THEOL_MOBILE_BASE = 'http://course.buct.edu.cn/mobile/';
+const DOMAIN_SYNC_TIMEOUT_MS = timeoutMilliseconds(NETWORK_TIMEOUTS.JWGLXT_SYNC) * 4;
 // The THEOL mobile gateway validates against the Courser-compatible protocol
 // version, which is independent from BetterBUCT's own release version.
 const THEOL_PROTOCOL_VERSION = '8.7.1';
@@ -261,6 +262,8 @@ export class MobileBridge {
     this._explicitlyLoggedOut = false;
     this._authRecovery = { inFlight: null, lastAt: 0, failures: 0 };
     this._loginInFlight = null;
+    this._domainSyncInFlight = new Map();
+    this._activeDomainProgress = null;
     this._campusClient = null;
     this._campusSync = null;
     this._theolMobileClient = null;
@@ -269,6 +272,11 @@ export class MobileBridge {
     this._campusSyncFactory = typeof campusSyncFactory === 'function' ? campusSyncFactory : null;
     this._auth = { ...disconnectedStatus(), };
     this._syncing = false;
+    // Full refreshes and scoped JWGLXT reads share the same state and client.
+    // Queue them instead of allowing a late response to overwrite a newer
+    // snapshot (or its progress message).
+    this._syncQueue = Promise.resolve();
+    this._syncOperationInFlight = null;
     this._syncProgress = null;
     this._credentialStatus = { saved: false, encryptionAvailable: false };
     this._academicApiCredentialStatus = { saved: false, encryptionAvailable: false, enabled: false };
@@ -286,6 +294,32 @@ export class MobileBridge {
     this._initPromise = null;
     this._mobileUpdateStatus = null;
     this._mobileUpdatePath = null;
+  }
+
+  _emitSyncProgress(progress) {
+    const activeDomain = this._activeDomainProgress;
+    if (activeDomain?.closed) return;
+    if (activeDomain && progress?.scope !== 'domain') {
+      // A single-domain read still passes through the shared login and
+      // JWGLXT adapter. Keep those lower-level events from replacing the
+      // domain-specific status shown by the mobile UI.
+      this.events.emit('sync-progress', {
+        scope: 'domain',
+        stage: activeDomain.stage,
+        status: 'syncing',
+        label: activeDomain.label,
+      });
+      return;
+    }
+    this.events.emit('sync-progress', progress);
+  }
+
+  _enqueueSyncOperation(task) {
+    const previous = this._syncQueue;
+    const run = previous.then(task, task);
+    // A failed operation must not permanently block the next queued read.
+    this._syncQueue = run.catch(() => undefined);
+    return run;
   }
 
   async init() {
@@ -407,7 +441,10 @@ export class MobileBridge {
       // cookie first, then let the bounded native login activity refresh the
       // expired CAS session without waiting for a renderer button. Cookie-only
       // sessions still stay non-interactive when their password was not saved.
-      await this.login({ silent: true, background: true, autoRecover: Boolean(credentials) });
+      // Restore the campus session without starting the full data sync. A
+      // renderer action may request one domain immediately after startup and
+      // must not inherit a long-running background sync promise.
+      await this.login({ silent: true, sync: false, background: true, autoRecover: Boolean(credentials) });
     } catch (error) {
       // Keep cached data and saved credentials on transient offline/auth errors.
       // The next background/foreground sync can retry through the bounded
@@ -673,7 +710,7 @@ export class MobileBridge {
   // shared campus session (jwglxt + theol + mail) when API-first login is not
   // available or a captcha is required.
   async loginWithRestrictedWebView({ url = unifiedLoginUrl(), username = '', password = '', autoFill = true } = {}) {
-    this.events.emit('sync-progress', { stage: 'login', status: 'syncing', label: '正在打开统一身份认证页面…' });
+    this._emitSyncProgress({ stage: 'login', status: 'syncing', label: '正在打开统一身份认证页面…' });
     const result = await this.session.openRestrictedLoginWebView({
       url,
       username,
@@ -682,7 +719,7 @@ export class MobileBridge {
       autoFill,
     });
     if (result?.canceled) return { canceled: true, cookies: '', theolConnected: false };
-    this.events.emit('sync-progress', { stage: 'login', status: 'syncing', label: '正在验证登录状态…' });
+    this._emitSyncProgress({ stage: 'login', status: 'syncing', label: '正在验证登录状态…' });
     return {
       canceled: false,
       cookies: result?.cookies || '',
@@ -907,9 +944,10 @@ export class MobileBridge {
       requestUrl: this._webPreview ? previewRequestUrl : null,
       fetchImpl: this._webPreview ? previewFetch : this._native ? nativeFetch : null,
       onProgress: (progress) => {
-        if (progress?.stage && progress?.status) {
-          this.events.emit('sync-progress', {
-            stage: progress.stage,
+        if (progress?.status) {
+          this._emitSyncProgress({
+            stage: progress.stage || 'jwglxt',
+            scope: progress.scope,
             status: progress.status,
             label: progress.label || undefined,
             error: progress.error || undefined,
@@ -952,7 +990,7 @@ export class MobileBridge {
       theol: { connected: false, unchecked: false, authPending: true },
     };
     this.events.emit('auth-status', this._auth);
-    this.events.emit('sync-progress', { stage: 'login', status: 'syncing', label });
+    this._emitSyncProgress({ stage: 'login', status: 'syncing', label });
   }
 
   _resetAuthRecovery() {
@@ -1033,7 +1071,11 @@ export class MobileBridge {
       };
     }
     this.events.emit('auth-status', this._auth);
-    this.events.emit('sync-progress', { stage: 'all', status: 'done', label: '教务系统登录成功，正在读取校园数据…' });
+    this._emitSyncProgress({
+      stage: 'all',
+      status: 'done',
+      label: sync ? '教务系统登录成功，正在读取校园数据…' : '教务系统登录成功',
+    });
     if (sync) await this.syncNow({ background, skipLoginWait });
   }
 
@@ -1051,18 +1093,18 @@ export class MobileBridge {
     // after an authoritative expiry so a stale cookie cannot be handed back.
     const existingCookies = forceReauth ? '' : await this._campusCookieHeader();
     if (existingCookies) {
-      this.events.emit('sync-progress', { stage: 'login', status: 'syncing', label: '正在尝试恢复已有登录状态…' });
+      this._emitSyncProgress({ stage: 'login', status: 'syncing', label: '正在尝试恢复已有登录状态…' });
       try {
         const reused = await this._createAcademicClient(credentials, { useCampusCookies: true, timeoutMs: timeoutMilliseconds(NETWORK_TIMEOUTS.JWGLXT_REUSE) });
         await reused.page(JWGLXT_HOME, { source: '教务系统' });
-        this.events.emit('sync-progress', { stage: 'login', status: 'syncing', label: '登录状态验证成功' });
+        this._emitSyncProgress({ stage: 'login', status: 'syncing', label: '登录状态验证成功' });
         await this._finishCampusLogin(reused, credentials, { sync, background, skipLoginWait: true });
         return;
       } catch {
         // The browser cookie expired; discard only the campus session snapshot
         // before the bounded native login below refreshes it. Saved unified
         // credentials remain untouched.
-        this.events.emit('sync-progress', { stage: 'login', status: 'syncing', label: '已有登录状态已失效，重新登录中…' });
+        this._emitSyncProgress({ stage: 'login', status: 'syncing', label: '已有登录状态已失效，重新登录中…' });
         if (autoRecover) {
           try { await this.session.clear?.('jwglxt.buct.edu.cn'); } catch { /* retry below */ }
         }
@@ -1086,7 +1128,7 @@ export class MobileBridge {
       autoFill: Boolean(credentials?.username && credentials?.password),
     });
     if (result.canceled) throw new Error('统一身份认证已取消');
-    this.events.emit('sync-progress', { stage: 'login', status: 'syncing', label: '正在验证教务系统登录状态…' });
+    this._emitSyncProgress({ stage: 'login', status: 'syncing', label: '正在验证教务系统登录状态…' });
     const cookieHeader = await this._campusCookieHeader();
     if (!cookieHeader) throw new Error('统一身份认证未建立教务系统会话');
     // RestrictedLoginActivity only returns after it has rendered and
@@ -1094,7 +1136,7 @@ export class MobileBridge {
     // GET to index_initMenu here: that redundant probe was the main source of
     // the 45-second post-login timeout on Android. The first real sync still
     // verifies the returned campus cookie and keeps the cached data on failure.
-    this.events.emit('sync-progress', { stage: 'login', status: 'syncing', label: '登录成功，正在初始化数据同步…' });
+    this._emitSyncProgress({ stage: 'login', status: 'syncing', label: '登录成功，正在初始化数据同步…' });
     const client = await this._createAcademicClient(credentials, { useCampusCookies: true });
     await this._finishCampusLogin(client, credentials, { sync, skipLoginWait: true });
   }
@@ -1111,7 +1153,7 @@ export class MobileBridge {
     }
   }
 
-  async _loginInternal({ silent = false, interactive = false, background = false, autoRecover = false } = {}) {
+  async _loginInternal({ silent = false, interactive = false, background = false, autoRecover = false, sync = true } = {}) {
     if (!silent) {
       this._explicitlyLoggedOut = false;
       this._resetAuthRecovery();
@@ -1123,7 +1165,7 @@ export class MobileBridge {
       this._theolMobileClient = null;
       try { await this.session.clear?.('jwglxt.buct.edu.cn'); } catch { /* retry below */ }
     }
-    this.events.emit('sync-progress', { stage: 'all', status: 'syncing', label: '正在连接校园系统…' });
+    this._emitSyncProgress({ stage: 'all', status: 'syncing', label: '正在连接校园系统…' });
     // Match BetterBUCT's two-channel contract: unified credentials belong to the
     // CAS/browser session; the optional API slot is independent. In a native
     // build, having both slots must never make the unified login submit the API
@@ -1150,31 +1192,31 @@ export class MobileBridge {
           console.debug(`[theia-mobile] campus login mode=preview-api source=${credentials.source || 'unknown'}`);
           const client = await this._createAcademicClient(credentials);
           await client.login();
-          await this._finishCampusLogin(client, credentials, { skipLoginWait: true });
+          await this._finishCampusLogin(client, credentials, { sync, background, skipLoginWait: true });
         } else if (!apiOnly || interactive) {
           console.debug(`[theia-mobile] campus login mode=cas source=${unifiedCredentials ? 'unified-credentials' : 'manual'}`);
-          await this._loginWithCas(unifiedCredentials, { silent, sync: true, interactive, background, autoRecover });
+          await this._loginWithCas(unifiedCredentials, { silent, sync, interactive, background, autoRecover });
         } else {
           // API-only login remains available only when the user has no saved
           // unified credential and explicitly enabled the API data channel.
           console.debug('[theia-mobile] campus login mode=academic-api source=academic-api-credentials');
           const client = await this._createAcademicClient(apiCredentials);
           await client.login();
-          await this._finishCampusLogin(client, credentials, { skipLoginWait: true });
+          await this._finishCampusLogin(client, credentials, { sync, background, skipLoginWait: true });
         }
         return;
       } catch (error) {
         console.warn('[theia-mobile] campus login failed:', error);
         if (isCampusAuthFailure(error)) this._markCampusAuthRequired(error);
         else this._markCampusConnectionFailure(error, apiOnly ? 'academic-api' : 'unified');
-        this.events.emit('sync-progress', { stage: 'all', status: 'error', label: apiOnly ? '教务 API 连接失败' : '校园登录失败', error: error?.message || String(error) });
+        this._emitSyncProgress({ stage: 'all', status: 'error', label: apiOnly ? '教务 API 连接失败' : '校园登录失败', error: error?.message || String(error) });
         throw error;
       }
     }
     if (this._demoMode) {
       this._auth = { ...connectedStatus() };
       this.events.emit('auth-status', this._auth);
-      await this.syncNow();
+      if (sync) await this.syncNow({ background });
       return;
     }
     if (this._webPreview) {
@@ -1184,7 +1226,7 @@ export class MobileBridge {
       // Manual login is allowed even when no password is stored. The native
       // restricted page remains the source of truth and returns only cookies.
       try {
-        await this._loginWithCas(null, { silent: false, sync: true, interactive: true, background: false, autoRecover: false });
+        await this._loginWithCas(null, { silent: false, sync, interactive: true, background, autoRecover: false });
         return;
       } catch (error) {
         if (isCampusAuthFailure(error)) this._markCampusAuthRequired(error);
@@ -1213,12 +1255,25 @@ export class MobileBridge {
     // Leave data intact, just disconnect
   }
 
-  async syncNow({ background = false, authRecoveryAttempted = false, skipLoginWait = false } = {}) {
+  async syncNow(options = {}) {
     await this.init();
-    if (this._syncing) return this._state;
+    if (this._syncOperationInFlight) {
+      return structuredClone(await this._syncOperationInFlight);
+    }
+    const run = this._enqueueSyncOperation(() => this._syncNow(options));
+    this._syncOperationInFlight = run;
+    try {
+      return await run;
+    } finally {
+      if (this._syncOperationInFlight === run) this._syncOperationInFlight = null;
+    }
+  }
+
+  async _syncNow({ background = false, authRecoveryAttempted = false, skipLoginWait = false } = {}) {
+    await this.init();
     if (!skipLoginWait && !this._campusSync && this._loginInFlight) {
       try { await this._loginInFlight; } catch { /* the current sync path reports the failure */ }
-      if (this._campusSync) return this.syncNow({ background, authRecoveryAttempted, skipLoginWait: true });
+      if (this._campusSync) return this._syncNow({ background, authRecoveryAttempted, skipLoginWait: true });
     }
     if (background && this._auth?.jwglxt?.authRequired && !this._campusSync) {
       const credentials = await this._getUnifiedCredentials();
@@ -1231,7 +1286,7 @@ export class MobileBridge {
     this._publishState();
 
     const emitProgress = (stage, status, label, error, metadata = {}) => {
-      this.events.emit('sync-progress', { stage, status, label, error, ...metadata });
+      this._emitSyncProgress({ stage, status, label, error, ...metadata });
     };
 
     try {
@@ -1310,7 +1365,7 @@ export class MobileBridge {
                 || await this._recoverCampusSession({ background, reason: 'theol' });
               if (recovered) {
                 this._syncing = false;
-                return await this.syncNow({ background, authRecoveryAttempted: true, skipLoginWait: true });
+                return await this._syncNow({ background, authRecoveryAttempted: true, skipLoginWait: true });
               }
             }
             emitProgress('theol', 'error', 'THEOL 会话已失效（教务数据已保留）', 'auth_required');
@@ -1402,7 +1457,7 @@ export class MobileBridge {
           // Release the outer guard before retrying so the bounded retry can
           // execute the real sync instead of returning the stale snapshot.
           this._syncing = false;
-          return await this.syncNow({ background, authRecoveryAttempted: true, skipLoginWait: true });
+          return await this._syncNow({ background, authRecoveryAttempted: true, skipLoginWait: true });
         }
       }
       if (authFailure) {
@@ -1434,8 +1489,141 @@ export class MobileBridge {
   }
 
   async retrySyncDomain(domain) {
+    if (domain === 'grade-details') {
+      await this.init();
+      const inFlight = this._domainSyncInFlight.get(domain);
+      if (inFlight) return structuredClone(await inFlight);
+
+      let resolveOperationCompletion;
+      let rejectOperationCompletion;
+      const activeProgress = {
+        stage: domain,
+        label: '正在读取成绩明细…',
+        closed: false,
+        operationCompletion: new Promise((resolve, reject) => {
+          resolveOperationCompletion = resolve;
+          rejectOperationCompletion = reject;
+        }),
+        resolveOperationCompletion,
+        rejectOperationCompletion,
+      };
+      this._activeDomainProgress = activeProgress;
+      this._emitSyncProgress({
+        scope: 'domain',
+        stage: domain,
+        status: 'syncing',
+        label: activeProgress.label,
+      });
+
+      const run = this._enqueueSyncOperation(() => this._retryJwglxtDomain(domain, activeProgress));
+      this._domainSyncInFlight.set(domain, run);
+
+      const clearInFlight = () => {
+        if (this._domainSyncInFlight.get(domain) === run) this._domainSyncInFlight.delete(domain);
+      };
+      // The public timeout can settle before the network request. Keep the
+      // in-flight guard until the underlying operation really completes.
+      void activeProgress.operationCompletion.then(clearInFlight, clearInFlight);
+      return await run;
+    }
     // For stage 0, just re-trigger a full sync
     return this.syncNow({ background: false });
+  }
+
+  async _retryJwglxtDomain(domain, activeProgress) {
+    const domainLabel = domain === 'grade-details' ? '成绩明细' : domain;
+
+    let timer = null;
+    const operation = (async () => {
+      if (!this._campusSync) await this.login({ silent: true, sync: false });
+      if (!this._campusSync) throw new Error(`教务连接未建立，无法读取${domainLabel}`);
+
+      const previousSync = structuredClone(this._state?.sync || {});
+      const readDomain = () => this._campusSync.syncJwglxt(this._state, {
+        domains: [domain],
+        progressScope: 'domain',
+        progressLabel: `${domainLabel}读取中…`,
+      });
+      let synced;
+      try {
+        synced = await readDomain();
+      } catch (error) {
+        if (!isCampusAuthFailure(error)) throw error;
+        const recovered = await this._recoverCampusSession({ background: false, reason: domain });
+        if (!recovered || !this._campusSync) throw error;
+        synced = await readDomain();
+      }
+
+      if (!synced?.state) throw new Error(`${domainLabel}读取未返回有效数据`);
+      this._state = {
+        ...synced.state,
+        sync: {
+          ...synced.state.sync,
+          lastStartedAt: previousSync.lastStartedAt ?? null,
+          lastCompletedAt: previousSync.lastCompletedAt ?? null,
+          lastRunAt: previousSync.lastRunAt ?? null,
+          lastSuccessAt: previousSync.lastSuccessAt ?? null,
+          lastError: previousSync.lastError ?? null,
+        },
+      };
+      await this._persist();
+      this._publishState();
+
+      const outcome = this._state.sync.domains?.[domain];
+      if (outcome?.status === 'failed' || outcome?.status === 'auth-required') {
+        const error = synced.result?.errors?.filter(Boolean).join('; ')
+          || outcome.errorCode
+          || `${domainLabel}读取失败`;
+        throw new Error(error);
+      }
+      const snapshot = structuredClone(this._state);
+      this._emitSyncProgress({
+        scope: 'domain',
+        stage: domain,
+        status: 'done',
+        label: `${domainLabel}读取完成`,
+      });
+      return snapshot;
+    })();
+
+    // Keep the domain marker alive until the underlying request settles. The
+    // user-facing timeout may finish first, but a late adapter event must not
+    // leak through as a new global sync message.
+    const operationCompletion = operation.then(
+      (value) => {
+        if (this._activeDomainProgress === activeProgress) this._activeDomainProgress = null;
+        activeProgress.resolveOperationCompletion?.(value);
+        return value;
+      },
+      (error) => {
+        if (this._activeDomainProgress === activeProgress) this._activeDomainProgress = null;
+        activeProgress.rejectOperationCompletion?.(error);
+        throw error;
+      },
+    );
+    void operationCompletion.catch(() => undefined);
+
+    try {
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error('成绩明细读取超时，请稍后重试'));
+        }, DOMAIN_SYNC_TIMEOUT_MS);
+      });
+      return await Promise.race([operation, timeout]);
+    } catch (error) {
+      const message = errorText(error);
+      this._emitSyncProgress({
+        scope: 'domain',
+        stage: domain,
+        status: 'error',
+        label: `${domainLabel}读取失败`,
+        error: message,
+      });
+      if (message === '成绩明细读取超时，请稍后重试') activeProgress.closed = true;
+      throw error;
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
   }
 
   async refreshCourseResources() {

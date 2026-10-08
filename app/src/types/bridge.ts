@@ -103,7 +103,7 @@ export interface TheiaBridge {
   openMailbox(): Promise<boolean>;
   readMailboxMessage(id: string, options?: { refresh?: boolean }): Promise<EmailMessage>;
   downloadMailboxAttachment(id: string, index: number): Promise<{ canceled: boolean; filePath?: string; filename?: string }>;
-  login(options?: { silent?: boolean; interactive?: boolean }): Promise<void>;
+  login(options?: { silent?: boolean; interactive?: boolean; sync?: boolean }): Promise<void>;
   logout(): Promise<AuthStatus>;
   syncNow(options?: { background?: boolean }): Promise<CampusState>;
   retrySyncDomain(domain: SyncRetryDomain): Promise<CampusState>;

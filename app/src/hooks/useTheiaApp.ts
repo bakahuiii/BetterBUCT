@@ -409,6 +409,17 @@ export function useTheiaApp() {
                 : "作业与测试更新完成",
             );
           }
+        } else if (progress.status === "syncing") {
+          setSyncing(true);
+          setSyncStage(progress.stage || "domain");
+          setSyncProgress(progress.label || "正在读取数据…");
+        } else if (progress.status === "done" || progress.status === "error") {
+          setSyncing(false);
+          setSyncStage(null);
+          setSyncProgress(
+            progress.label ||
+              (progress.status === "error" ? "数据读取失败" : "数据读取完成"),
+          );
         }
         return;
       }

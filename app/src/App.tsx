@@ -29,7 +29,8 @@ export default function App() {
   const app = useTheiaApp();
   // The shell is the single owner of the startup update check. Settings views
   // subscribe to the same bridge state instead of issuing another request.
-  const updateStatus = useGithubUpdateStatus(app.state?.appVersion || "web", { autoCheck: isMobile });
+  // Keep the mobile check silent. The update status is presented only in About.
+  useGithubUpdateStatus(app.state?.appVersion || "web", { autoCheck: isMobile });
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
   useAppearance(); // apply stored dark/light mode on mount
   // Notification settings now live inside the Tools surface. Migrate older
@@ -132,7 +133,6 @@ export default function App() {
         messageKind={app.messageKind}
         syncFailure={app.syncFailure}
         syncFreshness={app.syncFreshness}
-        updateStatus={updateStatus}
         paletteOpen={app.paletteOpen}
         paletteQuery={app.paletteQuery}
         paletteItems={app.paletteItems}
@@ -186,9 +186,6 @@ export default function App() {
             items={state.schedule}
             terms={app.visibleTerms}
             calendar={state.dataCatalog.collections.academicCalendar.calendar}
-            onExportPdf={() => void app.exportSchedulePdf()}
-            onOpenPdfDirectory={() => void app.openScheduleDirectory()}
-            exportingPdf={app.exportingSchedulePdf}
           />
         )}
         {app.view === "exams" && (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Database, RefreshCw, Search } from "lucide-react";
 import { EmptyState, formatDate } from "../../ui/app-shared";
 import type { AcademicExtraDomain, AcademicExtraRecord } from "../../types";
@@ -53,13 +53,6 @@ function matches(record: AcademicExtraRecord, query: string) {
 
 export function GradeDetailsPanel({ domain, refreshing, onRefresh }: { domain?: AcademicExtraDomain; refreshing: boolean; onRefresh: () => void }) {
   const [query, setQuery] = useState("");
-  const requested = useRef(false);
-  useEffect(() => {
-    if (!domain?.capturedAt && !refreshing && !requested.current) {
-      requested.current = true;
-      onRefresh();
-    }
-  }, [domain?.capturedAt, onRefresh, refreshing]);
   const groups = useMemo(() => groupsFor((domain?.records || []).filter((record) => matches(record, query))), [domain?.records, query]);
   const status = domain?.completeness === "partial" ? "部分读取" : domain?.capturedAt ? "已读取" : "未读取";
 

@@ -67,6 +67,13 @@ function domainResultPayload(domain, value, capturedAt) {
 
 export const JWGLXT_SYNC_METHODS = {
   async sync(options = {}) {
+    const progressScope = options.progressScope
+    const progressLabel = options.progressLabel
+    const emitProgress = (progress) => this.onProgress?.({
+      ...progress,
+      ...(progressScope ? { scope: progressScope } : {}),
+      ...(progressLabel ? { label: progressLabel } : {}),
+    })
     const requested = selectedDomains(options)
     const wants = (domain) => requested === null || requested.has(domain)
     const wantsCourses = wants('courses')
@@ -85,7 +92,8 @@ export const JWGLXT_SYNC_METHODS = {
       : requested === null ? [] : [...requested].filter((domain) => JWGLXT_ACTIVE_EXTRA_DOMAIN_NAMES.includes(domain))
     const needsExtras = extraDomains.length > 0
     const needsPlanIdentity = needsExtras && extraDomains.includes('academic-plan') && !needsSchedule
-    const needsTermContext = wants('terms') || needsSchedule || needsExams || needsSelectedCourses || needsPlanIdentity
+    const needsTermContext = wants('terms') || needsSchedule || needsExams || needsSelectedCourses
+      || needsPlanIdentity || extraDomains.includes('grade-details')
     const capturedAt = new Date().toISOString()
     const errors = []
     let scheduleIdentity = null
@@ -105,7 +113,7 @@ export const JWGLXT_SYNC_METHODS = {
       scheduleIdentityResolved = true
       resolveScheduleIdentity(scheduleIdentity)
     }
-    this.onProgress?.({ stage: 'jwglxt', status: 'syncing', label: '正在读取教务首页…' })
+    emitProgress({ stage: 'jwglxt', status: 'syncing', label: '正在读取教务首页…' })
 
     // ── 首页（登录检测 + 当前学期 + 通知）────────────────────────────
     const homepageResult = await this.client.page(HOME, { source: 'Academic system' })
@@ -179,7 +187,7 @@ export const JWGLXT_SYNC_METHODS = {
       const fetchLog = []
       const taskErrors = []
       for (const [index, t] of relevantTerms.entries()) {
-        this.onProgress?.({ stage: 'schedule', status: 'syncing', label: `抓取课表 ${t.label}（${index + 1}/${relevantTerms.length}）…` })
+        emitProgress({ stage: 'schedule', status: 'syncing', label: `抓取课表 ${t.label}（${index + 1}/${relevantTerms.length}）…` })
         let parsed = null
         let positioned = []
         let unpositioned = null
@@ -223,7 +231,7 @@ export const JWGLXT_SYNC_METHODS = {
         if (parsed && (!parsed.length || positioned.length)) {
           fetchLog.push({ termId: t.id, count: parsed.length, endpoint: endpointIndex })
           allSchedule.push(...parsed)
-          this.onProgress?.({ stage: 'schedule', status: 'term-done', label: `课表 ${t.label} 已读取 ${parsed.length} 条（${index + 1}/${relevantTerms.length}）` })
+          emitProgress({ stage: 'schedule', status: 'term-done', label: `课表 ${t.label} 已读取 ${parsed.length} 条（${index + 1}/${relevantTerms.length}）` })
           continue
         }
         if (parsed?.length) {
@@ -236,7 +244,7 @@ export const JWGLXT_SYNC_METHODS = {
             endpoint: endpointIndex,
             payload: describeJwSchedulePayload(unpositioned),
           })
-          this.onProgress?.({
+          emitProgress({
             stage: 'schedule',
             status: 'term-skipped',
             label: `课表 ${t.label} 未返回时间地点，已保留本地课表（${index + 1}/${relevantTerms.length}）`,
@@ -246,9 +254,9 @@ export const JWGLXT_SYNC_METHODS = {
         const error = lastError || new Error('schedule_empty_response')
         fetchLog.push({ termId: t.id, count: 0, error: compactError(error), endpoint: endpointIndex })
         taskErrors.push(compactError(error))
-        this.onProgress?.({ stage: 'schedule', status: 'term-error', label: `课表 ${t.label} 获取失败（${index + 1}/${relevantTerms.length}）` , error: compactError(error) })
+        emitProgress({ stage: 'schedule', status: 'term-error', label: `课表 ${t.label} 获取失败（${index + 1}/${relevantTerms.length}）` , error: compactError(error) })
       }
-      this.onProgress?.({ stage: 'schedule', status: 'done', label: `课表读取完成，共 ${allSchedule.length} 条` })
+      emitProgress({ stage: 'schedule', status: 'done', label: `课表读取完成，共 ${allSchedule.length} 条` })
       finishScheduleIdentity()
       const value = fetchLog.some((item) => !item.error && !item.unpositioned) ? allSchedule : undefined
       await notifyDomainResult('schedule', value, value === undefined
@@ -289,7 +297,7 @@ export const JWGLXT_SYNC_METHODS = {
       const allExams = []
       const fetchLog = []
       const taskErrors = []
-      this.onProgress?.({ stage: 'exams', status: 'syncing', label: `正在读取考试安排（${relevantTerms.length} 个学期）…` })
+      emitProgress({ stage: 'exams', status: 'syncing', label: `正在读取考试安排（${relevantTerms.length} 个学期）…` })
       try {
         const examsIndex = await this.client.page(examsIndexUrl, { source: 'Exams' })
         const examsForm = parseJwQueryForm(examsIndex.text, examsIndex.url, '#searchForm')
@@ -335,7 +343,7 @@ export const JWGLXT_SYNC_METHODS = {
       let value
       const taskErrors = []
       const fetchLog = []
-      this.onProgress?.({ stage: 'grades', status: 'syncing', label: '正在读取全部学期成绩…' })
+      emitProgress({ stage: 'grades', status: 'syncing', label: '正在读取全部学期成绩…' })
       const gradesIndexUrl = new URL('cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default', BASE).toString()
       let gradesIndex = null
       let gradesForm = null
@@ -449,7 +457,7 @@ export const JWGLXT_SYNC_METHODS = {
     const academicProgressTask = needsAcademicProgress ? (async () => {
       let value = null
       const taskErrors = []
-      this.onProgress?.({ stage: 'academic-progress', status: 'syncing', label: '正在读取 GPA 与学业进度…' })
+      emitProgress({ stage: 'academic-progress', status: 'syncing', label: '正在读取 GPA 与学业进度…' })
       try {
         value = await this.fetchAcademicProgress({ capturedAt })
       } catch (error) {
@@ -492,7 +500,7 @@ export const JWGLXT_SYNC_METHODS = {
       const routeResults = await mapWithConcurrency(routeJobs, EXTRA_QUERY_CONCURRENCY, async ({ domain, route, descriptor }) => {
         const url = new URL(route.path, BASE).toString()
         try {
-          this.onProgress?.({ stage: domain, status: 'syncing', label: `正在读取${descriptor.label}…` })
+          emitProgress({ stage: domain, status: 'syncing', label: `正在读取${descriptor.label}…` })
           const page = await this.client.page(url, { source: `JWGLXT ${descriptor.label}` })
           const planIdentity = domain === 'academic-plan' ? await scheduleIdentityReady : null
           const planHomepage = planIdentity
@@ -587,7 +595,7 @@ export const JWGLXT_SYNC_METHODS = {
       const allSelectedCourses = []
       const fetchLog = []
       const taskErrors = []
-      this.onProgress?.({ stage: 'selected-courses', status: 'syncing', label: `正在读取已选课程（${relevantTerms.length} 个学期）…` })
+      emitProgress({ stage: 'selected-courses', status: 'syncing', label: `正在读取已选课程（${relevantTerms.length} 个学期）…` })
       for (const t of relevantTerms) {
         try {
           const body = await this.client.form(selectedCoursesUrl, {
@@ -611,7 +619,7 @@ export const JWGLXT_SYNC_METHODS = {
     const noticesTask = needsNotices ? (async () => {
       let value
       const taskErrors = []
-      this.onProgress?.({ stage: 'notices', status: 'syncing', label: '正在读取教务通知…' })
+      emitProgress({ stage: 'notices', status: 'syncing', label: '正在读取教务通知…' })
       const noticesUrl = new URL('xtgl/index_cxDbsy.html?doType=query', BASE).toString()
       try {
         const body = await this.client.form(noticesUrl, {

@@ -995,7 +995,7 @@ html[data-app-background="image"] .topbar {
 /* Week navigation stays readable while keeping direct keyboard and button controls. */
 .week-navigator {
   display: inline-grid;
-  grid-template-columns: auto minmax(132px, 1fr) auto auto;
+  grid-template-columns: auto minmax(132px, 1fr) auto;
   align-items: stretch;
   gap: 6px;
   min-height: 38px;
@@ -1038,8 +1038,7 @@ html[data-app-background="image"] .topbar {
   font-variant-numeric: tabular-nums;
 }
 
-.week-navigator-current > span,
-.week-navigator-input > span {
+.week-navigator-current > span {
   color: var(--muted-foreground);
   font-size: 9px;
   font-weight: 700;
@@ -1062,33 +1061,221 @@ html[data-app-background="image"] .topbar {
   white-space: nowrap;
 }
 
-.week-navigator-input {
-  display: inline-grid;
-  grid-template-columns: auto 34px;
-  align-items: center;
-  gap: 3px;
-  padding: 0 7px;
-  border-left: 1px solid var(--border);
-  font-variant-numeric: tabular-nums;
+.schedule-toolbar {
+  position: relative;
+  z-index: 5;
+  min-height: 46px;
+  margin-bottom: 10px;
+  padding: 6px 9px;
 }
 
-.week-navigator-input input {
-  width: 34px;
-  min-height: 27px;
-  padding: 0 2px;
+.schedule-toolbar-main {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
+
+.schedule-heading-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  margin-right: auto;
+  line-height: 1.15;
+}
+
+.schedule-heading-copy > span {
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.schedule-heading-copy > strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.schedule-toolbar-main > .schedule-today-button,
+.schedule-controls-trigger {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
   color: var(--foreground);
   background: var(--card);
-  border: 1px solid var(--input);
-  border-radius: 7px;
-  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   font-size: 11px;
-  text-align: center;
-  outline: none;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.week-navigator-input input:focus {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
+.schedule-controls-trigger {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+
+.schedule-toolbar-main > .schedule-today-button:hover,
+.schedule-controls-trigger:hover,
+.schedule-controls-trigger[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
+.schedule-controls-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.schedule-toolbar {
+  flex-wrap: wrap;
+}
+
+.schedule-toolbar-main {
+  flex: 1 0 100%;
+}
+
+.schedule-week-toolbar {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.schedule-week-toolbar .week-navigator {
+  width: min(100%, 320px);
+}
+
+.schedule-controls-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, calc(100vw - 28px));
+  display: grid;
+  gap: 13px;
+  padding: 15px;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px color-mix(in srgb, #000 22%, transparent);
+}
+
+.schedule-controls-panel-header,
+.schedule-controls-row,
+.schedule-controls-term {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-controls-panel-header > div,
+.schedule-controls-term {
+  display: grid;
+  gap: 3px;
+}
+
+.schedule-controls-panel-header strong {
+  font-size: 13px;
+}
+
+.schedule-controls-panel-header span,
+.schedule-controls-row > span,
+.schedule-controls-term > span {
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.schedule-controls-panel-header > button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.schedule-controls-panel .term-selector-group,
+.schedule-controls-panel .term-selector-trigger {
+  width: 100%;
+  min-width: 0;
+}
+
+.schedule-controls-panel .schedule-layout-switch,
+.schedule-controls-panel .schedule-range-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* Keep week navigation and primary actions on one predictable toolbar row. */
+.schedule-toolbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.schedule-heading-copy {
+  display: none !important;
+}
+
+.schedule-week-toolbar {
+  grid-column: 1;
+  grid-row: 1;
+  width: auto;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.schedule-week-toolbar .week-navigator {
+  width: min(100%, 360px);
+}
+
+.schedule-toolbar-main {
+  grid-column: 2;
+  grid-row: 1;
+  width: auto;
+  min-width: 0;
+  display: flex;
+  flex: 0 0 auto !important;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 860px) {
+  .schedule-toolbar {
+    display: grid !important;
+    align-items: center !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 6px !important;
+    padding: 6px 8px !important;
+  }
+
+  .schedule-toolbar-main {
+    display: flex !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+    flex-wrap: nowrap !important;
+    gap: 7px !important;
+  }
+
+  .schedule-toolbar-main > .schedule-today-button {
+    width: auto !important;
+    min-height: 36px !important;
+    flex: 0 0 auto;
+  }
+
+  .schedule-week-toolbar {
+    width: auto;
+    justify-content: flex-start;
+  }
 }
 
 /* Flat grade tiles: icon, label and value remain visible without a horizontal strip. */

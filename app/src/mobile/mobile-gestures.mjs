@@ -1,150 +1,107 @@
-// Mobile edge-refresh gesture handler.
-// BetterBUCT scrolls inside .workspace (not window), so the gesture must check the
-// container's scrollTop — window.scrollY is always 0 in this app shell.  The
-// gesture intentionally works at both edges: pull down at the top and pull up
-// at the bottom.  A normal swipe in the middle of the page must remain a scroll.
-export function installPullToRefresh({ onRefresh, threshold = 80, element = document.documentElement } = {}) {
-  if (typeof onRefresh !== 'function') return () => {};
-  let startY = 0;
-  let startX = 0;
-  let pulling = false;
-  let edge = null;
-  let refreshing = false;
-  let activeScroller = null;
+// Kept as a compatibility export for older mobile entry points.
+// Pull-to-refresh is intentionally disabled; refresh is available from the
+// explicit action in the application UI.
+export function installPullToRefresh() {
+  return () => {};
+}
 
-  const usableScroller = (candidate) => Boolean(
-    candidate && (candidate.clientHeight > 0 || candidate.scrollHeight > 0),
-  );
+const TOUCH_SLOP_PX = 8;
+const SCROLLABLE_OVERFLOW = /^(auto|scroll|overlay)$/;
 
-  const findScroller = (target) => {
-    const closest = target?.closest?.('.settings-mobile-shell, .settings-page-shell, .workspace');
-    if (usableScroller(closest)) return closest;
-    for (const selector of ['.settings-mobile-shell', '.settings-page-shell', '.workspace']) {
-      const candidate = document.querySelector(selector);
-      if (usableScroller(candidate)) return candidate;
+function isEditableTarget(target) {
+  if (!target || typeof target.closest !== 'function') return false;
+  return Boolean(target.closest('input, textarea, select, button, [contenteditable="true"]'));
+}
+
+function isVerticalScroller(element) {
+  if (!element || element.nodeType !== 1) return false;
+  const style = globalThis.getComputedStyle?.(element);
+  if (!style || !SCROLLABLE_OVERFLOW.test(style.overflowY || '')) return false;
+  return element.scrollHeight > element.clientHeight + 1;
+}
+
+function canScrollUpFrom(target, documentRef) {
+  let element = target && target.nodeType === 1 ? target : null;
+  while (element) {
+    if (isVerticalScroller(element) && element.scrollTop > 0.5) return true;
+    element = element.parentElement;
+  }
+
+  const scrollingElement = documentRef?.scrollingElement;
+  if (scrollingElement?.scrollTop > 0.5) return true;
+  return Number(globalThis.scrollY || 0) > 0.5;
+}
+
+function touchForEvent(event, identifier) {
+  const touches = event?.touches || [];
+  return Array.from(touches).find((touch) => touch.identifier === identifier) || null;
+}
+
+/**
+ * Stop the Android/WebView edge refresh gesture at the actual DOM scroll
+ * owner. CSS overscroll-behavior is not honored consistently by all WebView
+ * versions, so this is deliberately a narrow capture-phase fallback.
+ */
+export function installPullToRefreshBlocker(documentRef = globalThis.document) {
+  if (!documentRef?.addEventListener) return () => {};
+
+  let gesture = null;
+  const onTouchStart = (event) => {
+    const touches = event?.touches || [];
+    if (touches.length > 1) {
+      if (gesture) gesture.ignored = true;
+      return;
     }
-    return document.documentElement;
-  };
-
-  const scroller = () => activeScroller || document.documentElement;
-
-  const createIndicator = () => {
-    const el = document.createElement('div');
-    el.className = 'theia-pull-to-refresh';
-    el.innerHTML = '<div class="spinner"></div><span>正在更新…</span>';
-    el.style.display = 'none';
-    document.body.prepend(el);
-    return el;
-  };
-
-  const indicator = createIndicator();
-  const label = () => indicator.querySelector('span');
-
-  const hide = () => {
-    indicator.style.height = '0';
-    indicator.style.display = 'none';
-    indicator.classList.remove('active');
-    indicator.classList.remove('bottom');
-    edge = null;
-    activeScroller = null;
-  };
-
-  const cancel = () => {
-    pulling = false;
-    if (!refreshing) hide();
-  };
-
-  const edgeState = () => {
-    const current = scroller();
-    const maxScrollTop = Math.max(0, current.scrollHeight - current.clientHeight);
-    return {
-      atTop: current.scrollTop <= 1,
-      atBottom: maxScrollTop <= 1 || current.scrollTop >= maxScrollTop - 1,
+    const touch = event?.touches?.[0];
+    if (!touch) return;
+    gesture = {
+      identifier: touch.identifier,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      target: event.target,
+      ignored: isEditableTarget(event.target),
     };
   };
 
-  const onTouchStart = (e) => {
-    if (refreshing || e.touches.length !== 1) return;
-    const touch = e.touches[0];
+  const onTouchMove = (event) => {
+    if (!gesture || gesture.ignored) return;
+    if ((event?.touches || []).length !== 1) {
+      gesture.ignored = true;
+      return;
+    }
+    const touch = touchForEvent(event, gesture.identifier);
     if (!touch) return;
-    activeScroller = findScroller(e.target);
-    const { atTop, atBottom } = edgeState();
-    if (!atTop && !atBottom) return;
-    startY = touch.clientY;
-    startX = touch.clientX;
-    pulling = true;
-    // If the page has no scrollable content both edges are true.  Delay the
-    // edge choice until the first meaningful vertical movement in that case.
-    edge = atTop && !atBottom ? 'top' : atBottom && !atTop ? 'bottom' : null;
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    if (Math.abs(dy) < TOUCH_SLOP_PX || Math.abs(dx) >= Math.abs(dy) || dy <= 0) return;
+
+    // Let a nested or outer scroll owner consume the drag while it still has
+    // content above the viewport. Only block the edge gesture when the whole
+    // vertical scroll chain is already at its top boundary.
+    if (canScrollUpFrom(gesture.target, documentRef)) return;
+    event.preventDefault?.();
   };
 
-  const onTouchMove = (e) => {
-    if (!pulling) return;
-    if (e.touches.length !== 1) return cancel();
-    const touch = e.touches[0];
-    if (!touch) return;
-    const diffY = touch.clientY - startY;
-    const diffX = touch.clientX - startX;
-    if (Math.abs(diffY) < 4) return;
-    // Do not turn a horizontal control gesture into a refresh gesture.
-    if (Math.abs(diffX) > Math.abs(diffY)) return cancel();
-
-    const { atTop, atBottom } = edgeState();
-    if (!edge) {
-      edge = diffY > 0 && atTop ? 'top' : diffY < 0 && atBottom ? 'bottom' : null;
-      if (!edge) return cancel();
+  const reset = (event) => {
+    if (event?.type === 'touchcancel' || !(event?.touches || []).length) {
+      gesture = null;
+      return;
     }
-    const distance = edge === 'top' ? diffY : -diffY;
-    // The finger moved in the wrong direction, or the content started to
-    // scroll away from the edge: this is an ordinary scroll, not a refresh.
-    if (distance <= 0 || (edge === 'top' && !atTop) || (edge === 'bottom' && !atBottom)) {
-      return cancel();
-    }
-    const progress = Math.min(1, distance / threshold);
-    indicator.style.display = '';
-    indicator.style.height = (progress * 52) + 'px';
-    indicator.classList.toggle('bottom', edge === 'bottom');
-    indicator.classList.toggle('active', progress >= 1);
-    label().textContent = progress >= 1
-      ? '松开立即更新'
-      : edge === 'bottom' ? '继续上拉更新' : '继续下拉更新';
-  };
-
-  const onTouchEnd = (e) => {
-    if (!pulling) return;
-    pulling = false;
-    const touch = e.changedTouches?.[0];
-    const diffY = touch ? touch.clientY - startY : 0;
-    const distance = edge === 'top' ? diffY : edge === 'bottom' ? -diffY : 0;
-    if (!refreshing && edge && distance >= threshold) {
-      refreshing = true;
-      label().textContent = '正在更新…';
-      // Promise.resolve also handles a synchronous callback and ensures a
-      // thrown error can never leave the indicator stuck on screen.
-      Promise.resolve()
-        .then(() => onRefresh())
-        .catch(() => undefined)
-        .finally(() => {
-          refreshing = false;
-          hide();
-        });
-    } else {
-      hide();
+    if (gesture && Array.from(event?.changedTouches || []).some((touch) => touch.identifier === gesture.identifier)) {
+      gesture = null;
     }
   };
-
-  const onTouchCancel = () => cancel();
-
-  element.addEventListener('touchstart', onTouchStart, { passive: true });
-  element.addEventListener('touchmove', onTouchMove, { passive: true });
-  element.addEventListener('touchend', onTouchEnd, { passive: true });
-  element.addEventListener('touchcancel', onTouchCancel, { passive: true });
+  const options = { capture: true, passive: false };
+  documentRef.addEventListener('touchstart', onTouchStart, options);
+  documentRef.addEventListener('touchmove', onTouchMove, options);
+  documentRef.addEventListener('touchend', reset, { capture: true });
+  documentRef.addEventListener('touchcancel', reset, { capture: true });
 
   return () => {
-    element.removeEventListener('touchstart', onTouchStart);
-    element.removeEventListener('touchmove', onTouchMove);
-    element.removeEventListener('touchend', onTouchEnd);
-    element.removeEventListener('touchcancel', onTouchCancel);
-    indicator.remove();
+    documentRef.removeEventListener('touchstart', onTouchStart, options);
+    documentRef.removeEventListener('touchmove', onTouchMove, options);
+    documentRef.removeEventListener('touchend', reset, { capture: true });
+    documentRef.removeEventListener('touchcancel', reset, { capture: true });
+    gesture = null;
   };
 }

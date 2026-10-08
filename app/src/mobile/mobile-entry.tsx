@@ -29,12 +29,17 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import MobileActions from './MobileActions';
 import MobileTabBar from './MobileTabBar';
+import { installPullToRefreshBlocker } from './mobile-gestures.mjs';
 import '../main';
 // mobile.css must load AFTER '../main' (which pulls desktop styles.css) so our
 // mobile overrides win the cascade.
 import './mobile.css';
-import { installPullToRefresh } from './mobile-gestures.mjs';
 import { bridge } from '../bridge';
+
+// Android WebView versions differ in how reliably they honor
+// overscroll-behavior. Install the narrow DOM boundary guard before React
+// mounts so the edge gesture cannot become a refresh action.
+installPullToRefreshBlocker();
 
 // Native status bar theming — follows the app's light/dark appearance.
 async function applyStatusBar() {
@@ -77,9 +82,9 @@ function MobileEnhancements() {
     };
 
     const bridgeAny = bridge as any;
-    bridgeAny.events?.on('sync-progress', handleProgress);
+    const offProgress = bridgeAny.events?.on('sync-progress', handleProgress);
     return () => {
-      bridgeAny.events?.off('sync-progress', handleProgress);
+      offProgress?.();
     };
   }, []);
 
@@ -161,14 +166,11 @@ function mountMobileEnhancements() {
   host.id = 'theia-mobile-enhancements';
   document.body.appendChild(host);
   createRoot(host).render(<MobileEnhancements />);
-  installPullToRefresh({
-    onRefresh: () => bridge.syncNow().catch(() => undefined),
-  } as never);
 }
 
 // The native WebView can resume this entry after DOMContentLoaded has already
-// fired.  Mount immediately in that case; otherwise the old one-shot listener
-// silently skipped the gesture installer and left only the top-right button.
+// fired. Mount immediately in that case; otherwise the one-shot listener is
+// enough for the enhancement host.
 if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', mountMobileEnhancements, { once: true });
 } else {

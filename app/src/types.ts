@@ -1015,6 +1015,8 @@ export type * from "./types/bridge";
 // 同步进度事件类型
 export interface SyncProgressEvent {
   status: 'syncing' | 'done' | 'error';
+  stage?: string;
+  scope?: 'domain';
   label?: string;
   error?: string;
 }
