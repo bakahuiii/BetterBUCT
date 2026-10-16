@@ -35,6 +35,7 @@ public final class CampusDnsProxy {
     static {
         FALLBACK_IPS.put("portal.buct.edu.cn", "121.195.153.209");
         FALLBACK_IPS.put("experimental-auth-endpoint.buct.edu.cn", "222.199.255.27");
+        FALLBACK_IPS.put("sidportal.buct.edu.cn", "222.199.255.34");
         FALLBACK_IPS.put("caddy.buct.edu.cn", "222.199.255.27");
         FALLBACK_IPS.put("east-campus-servers-cluster.buct.edu.cn", "222.199.255.27");
         FALLBACK_IPS.put("jwglxt.buct.edu.cn", "121.195.154.238");

@@ -102,11 +102,13 @@ Android 版本目前不开放以下功能：
 
 ### 最新稳定版本
 
-**v0.2.28** (2026-10-08)
+**v0.2.29** (2026-10-17)
 
-- [GitHub Release 页面](https://github.com/bakahuiii/BetterBUCT/releases/tag/v0.2.28)
-- [下载 Android APK](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.28/BetterBUCT-Android-0.2.28-release.apk) (4.2 MB)
-- [下载 SHA-256 校验文件](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.28/BetterBUCT-Android-0.2.28-release.apk.sha256)
+- [GitHub Release 页面](https://github.com/bakahuiii/BetterBUCT/releases/tag/v0.2.29)
+- [下载 Android APK](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.29/BetterBUCT-Android-0.2.29-release.apk)
+- [下载 SHA-256 校验文件](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.29/BetterBUCT-Android-0.2.29-release.apk.sha256)
+
+本版本更新学校新版 SId 统一身份认证入口及登录页适配，包含 Android 登录白名单、DNS 回退、账号密码登录方式选择和 JWGLXT 登录页识别修复。
 
 ### 系统要求
 
@@ -124,7 +126,7 @@ Android 版本目前不开放以下功能：
 1. 下载 APK 和 SHA-256 文件
 2. 验证文件完整性（推荐）：
    ```bash
-   sha256sum -c BetterBUCT-Android-0.2.28-release.apk.sha256
+   sha256sum -c BetterBUCT-Android-0.2.29-release.apk.sha256
    ```
 3. 安装 APK（需允许安装未知来源应用）
 4. 首次打开输入教务系统账号密码

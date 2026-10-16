@@ -11,6 +11,8 @@ import { CampusSync } from '../src/mobile/campus/campus-sync.mjs';
 import { AuthRequiredError } from '../../core/source-client.mjs';
 import { emptyState } from '../../core/schema.mjs';
 import { htmlLooksLikeLogin } from '../../core/util.mjs';
+import { parseJwHomepage } from '../../core/parsers/jwglxt.mjs';
+import { unifiedLoginUrl } from '../../core/adapters/jwglxt-helpers.mjs';
 
 test('THEOL mobile JSON success is not mistaken for an HTML login page', () => {
   const payload = JSON.stringify({
@@ -32,6 +34,19 @@ test('HTML login pages remain recognized after the JSON guard', () => {
     ),
     true,
   );
+});
+
+test('unified campus login uses the SId portal callback', () => {
+  assert.equal(
+    unifiedLoginUrl(),
+    'https://sidportal.buct.edu.cn/login?service=https%3A%2F%2Fjwglxt.buct.edu.cn%2Fsso%2Fjziotlogin',
+  );
+});
+
+test('SId portal login pages are not mistaken for an authenticated JWGLXT page', () => {
+  const html = '<html><body><h1>统一身份认证</h1><button>用户名密码</button></body></html>';
+  assert.equal(htmlLooksLikeLogin(html, unifiedLoginUrl()), true);
+  assert.equal(parseJwHomepage(html, unifiedLoginUrl()).loggedIn, false);
 });
 test('native academic login preserves campus cookies through the first authenticated page', async () => {
   const { publicKey, privateKey } = nodeCrypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -624,7 +639,7 @@ test('native unified credentials use CAS and reuse the captured campus cookie', 
 
   await bridge.login();
   const snapshot = await bridge.getSnapshot();
-  assert.match(openedUrl, /experimental-auth-endpoint\.buct\.edu\.cn/);
+  assert.equal(openedUrl, unifiedLoginUrl());
   assert.equal(clientOptions.cookieHeader, 'JSESSIONID=cas-session');
   assert.equal(pageCalls, 0);
   assert.equal(snapshot.profile.name, 'CAS 用户');

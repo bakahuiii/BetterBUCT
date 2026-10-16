@@ -130,7 +130,7 @@ export class SessionService {
 
 export const CAMPUS_WHITELIST = [
   'buct.edu.cn', 'jwglxt.buct.edu.cn', 'course.buct.edu.cn',
-  'authserver.buct.edu.cn', 'experimental-auth-endpoint.buct.edu.cn', 'portal.buct.edu.cn',
+  'authserver.buct.edu.cn', 'experimental-auth-endpoint.buct.edu.cn', 'portal.buct.edu.cn', 'sidportal.buct.edu.cn',
   'mail.buct.edu.cn', 'motion.buct.edu.cn',
   'xsfw.buct.edu.cn', 'ehall.buct.edu.cn', 'lib.buct.edu.cn',
 ];

@@ -92,7 +92,7 @@ public class RestrictedLoginActivity extends Activity {
         whitelist.addAll(Arrays.asList(
             "buct.edu.cn", "jwglxt.buct.edu.cn", "course.buct.edu.cn",
             "authserver.buct.edu.cn", "experimental-auth-endpoint.buct.edu.cn",
-            "portal.buct.edu.cn", "mail.buct.edu.cn", "motion.buct.edu.cn",
+            "portal.buct.edu.cn", "sidportal.buct.edu.cn", "mail.buct.edu.cn", "motion.buct.edu.cn",
             "xsfw.buct.edu.cn", "ehall.buct.edu.cn", "lib.buct.edu.cn"
         ));
 
@@ -268,7 +268,8 @@ public class RestrictedLoginActivity extends Activity {
             + "const year=document.querySelector('#xnm,select[name=\"xnm\"],select[name=\"xnmValue\"],input[name=\"xnm\"]');"
             + "const semester=document.querySelector('#xqm,select[name=\"xqm\"],select[name=\"xqmValue\"],input[name=\"xqm\"]');"
             + "const academicTerm=!!String(year&&(year.value||year.getAttribute('value'))||'').trim()&&!!String(semester&&(semester.value||semester.getAttribute('value'))||'').trim();"
-            + "const authenticated=!pageUrl.hostname.toLowerCase().endsWith('experimental-auth-endpoint.buct.edu.cn')&&(profile||studentId||academicTerm||academicMenu);"
+            + "const authHost=/^(?:experimental-auth-endpoint|portal|sidportal|authserver)\\.buct\\.edu\\.cn$/i.test(pageUrl.hostname);"
+            + "const authenticated=!authHost&&(profile||studentId||academicTerm||academicMenu);"
             + "return (loginForm?'LOGIN':'')+'|'+(authenticated?'AUTH':'');"
             + "})()";
         view.evaluateJavascript(script, value -> {
@@ -446,6 +447,9 @@ public class RestrictedLoginActivity extends Activity {
             + "for(const d of docs){"
             + "const inputs=[...d.querySelectorAll('input')].filter(visible);"
             + "const passInput=inputs.find(e=>e.id!=='hidMm'&&(String(e.type||'').toLowerCase()==='password'||/^(?:password|passwd|pwd|mm)$/i.test(String(e.name||'').trim())||e.id==='mm'));"
+            + "if(!passInput){const choices=[...d.querySelectorAll('button,a,[role=button],[data-login-type],[title],[aria-label]')].filter(visible);"
+            + "const choice=choices.find(e=>/用户名密码|账号密码|密码登录|UsernamePassword|password/i.test([e.textContent,e.getAttribute('title'),e.getAttribute('aria-label'),e.getAttribute('data-login-type'),e.className].filter(Boolean).join(' ')));"
+            + "if(choice){choice.click();return 'choice-clicked';}}"
             + "const userInput=d.querySelector('input[name=username],input[name=userName],input[name=account],input[name=loginName],input[name=j_username],input[name=yhm],input[id=username],input[id=userName],input[id=account],input#yhm');"
             + "const fallback=inputs.find(e=>e!==passInput&&!['hidden','submit','button'].includes(String(e.type||'').toLowerCase()));"
             + "const uin=(userInput&&visible(userInput))?userInput:fallback;"
@@ -454,7 +458,9 @@ public class RestrictedLoginActivity extends Activity {
             + "if(submit){submit.click()}else if(passInput.form&&passInput.form.requestSubmit){passInput.form.requestSubmit()}else if(passInput.form){passInput.form.submit()}"
             + "return 'submitted';}return 'not-ready';})()";
         view.evaluateJavascript(script, value -> {
-            if (String.valueOf(value).contains("submitted")) credentialsSubmitted = true;
+            String result = String.valueOf(value);
+            if (result.contains("submitted")) credentialsSubmitted = true;
+            else if (result.contains("choice-clicked")) handler.postDelayed(() -> fillCredentials(view), 250L);
         });
     }
 
@@ -489,6 +495,7 @@ public class RestrictedLoginActivity extends Activity {
             String host = String.valueOf(Uri.parse(rawUrl).getHost()).toLowerCase();
             return "experimental-auth-endpoint.buct.edu.cn".equals(host)
                 || "portal.buct.edu.cn".equals(host)
+                || "sidportal.buct.edu.cn".equals(host)
                 || "authserver.buct.edu.cn".equals(host);
         } catch (Exception ignored) {
             return false;

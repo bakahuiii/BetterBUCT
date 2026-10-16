@@ -79,11 +79,13 @@ export function requirementTreeHasCourses(progress) {
   }
   return false
 }
-const UNIFIED_AUTH = 'https://experimental-auth-endpoint.buct.edu.cn/'
+// BUCT migrated the shared identity provider from the legacy experimental
+// gateway to the SId portal. Keep the service callback explicit so the portal
+// can return to JWGLXT after authentication.
+const UNIFIED_AUTH = 'https://sidportal.buct.edu.cn/login'
 
 export function unifiedLoginUrl() {
   const url = new URL(UNIFIED_AUTH)
-  url.searchParams.set('timestamp', String(Date.now()))
   url.searchParams.set('service', 'https://jwglxt.buct.edu.cn/sso/jziotlogin')
   return url.toString()
 }

@@ -118,7 +118,11 @@ export function parseJwHomepage(html, baseUrl) {
       notices.push({ id: stableId('jw-notice', href, title), title, source: 'jwglxt', sourceUrl: href, publishedAt: parseDateLike(parentText) })
     }
   })
-  const isUnifiedAuthPage = pageUrl.hostname === 'experimental-auth-endpoint.buct.edu.cn'
+  const isUnifiedAuthPage = new Set([
+    'experimental-auth-endpoint.buct.edu.cn',
+    'portal.buct.edu.cn',
+    'sidportal.buct.edu.cn',
+  ]).has(pageUrl.hostname)
   const isLoginPage = /\/xtgl\/login_slogin\.html$/i.test(pageUrl.pathname) || ($('#dl, #yhm, #mm').length >= 2 && $('form[action*="login_slogin"]').length > 0)
   const hasAcademicNavigation = menus.some((item) => /(?:kbcx|cjcx|kwgl|xtgl\/index)/i.test(item.path || ''))
   return {
