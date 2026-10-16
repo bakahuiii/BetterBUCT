@@ -89,4 +89,8 @@
 - [x] JWGLXT 统一认证入口切换至 `sidportal.buct.edu.cn`，保留教务系统服务回调。
 - [x] Android 受限登录页加入新域名白名单、DNS 回退和账号密码登录方式自动选择。
 - [x] 认证页识别和会话判定覆盖新版门户，避免将门户登录表单误判为已登录。
-- [x] 更新发布版本至 `0.2.29` / `versionCode 29`；代码和包信息通过情况以本次发布验证记录为准。
+- [x] 更新发布版本至 `0.2.29` / `versionCode 29`。
+- [x] `npm run check`：类型检查、64 项 Node 测试和 Vite 生产构建全部通过。
+- [x] `npm run android:release`：签名 Release APK 构建成功；`apksigner` v1/v2 验证通过，包名和版本信息正确。
+- [x] 正式 APK SHA-256：`fd1db3ac6c0794175b547dfde89570e0513665ebf88b81cab06c74d55265ee58`。
+- [ ] 本次未在模拟器或实体设备安装并执行真实校园账号登录；自动化和签名验证不代表设备端登录验收。

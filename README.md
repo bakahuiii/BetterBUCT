@@ -105,7 +105,7 @@ Android 版本目前不开放以下功能：
 **v0.2.29** (2026-10-17)
 
 - [GitHub Release 页面](https://github.com/bakahuiii/BetterBUCT/releases/tag/v0.2.29)
-- [下载 Android APK](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.29/BetterBUCT-Android-0.2.29-release.apk)
+- [下载 Android APK](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.29/BetterBUCT-Android-0.2.29-release.apk) (7.1 MiB)
 - [下载 SHA-256 校验文件](https://github.com/bakahuiii/BetterBUCT/releases/download/v0.2.29/BetterBUCT-Android-0.2.29-release.apk.sha256)
 
 本版本更新学校新版 SId 统一身份认证入口及登录页适配，包含 Android 登录白名单、DNS 回退、账号密码登录方式选择和 JWGLXT 登录页识别修复。
